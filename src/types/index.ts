@@ -12,6 +12,8 @@ export interface User {
   identifier?: string; // MSSV hoặc MaGiangVien
   avatar?: string;
   isActive: boolean;
+  // UC-13: BE bật cờ này khi admin tạo/reset mật khẩu → FE phải chặn navigation và buộc đổi mật khẩu trước.
+  mustChangePassword?: boolean;
 }
 
 // Entity đại diện cho bảng NguoiDung trong DB

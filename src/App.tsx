@@ -12,6 +12,7 @@ import AcademicLayout from './layouts/AcademicLayout';
 
 // Auth page
 import Login from './pages/auth/Login';
+import ChangePassword from './pages/auth/ChangePassword';
 
 // Student pages
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -79,6 +80,9 @@ function App() {
                             <Routes>
                                 {/* Route Đăng nhập */}
                                 <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+
+                                {/* UC-13: Đổi mật khẩu (cả luồng buộc đổi lần đầu lẫn tự nguyện) */}
+                                <Route path="/change-password" element={<PrivateRoute><ChangePassword /></PrivateRoute>} />
 
                                 {/* Chuyển hướng Trang chủ "/" dựa trên Role */}
                                 <Route path="/" element={<PrivateRoute><NavigateToDashboardByRole /></PrivateRoute>} />
