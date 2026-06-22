@@ -79,6 +79,8 @@ export default function GradingWorkshop() {
   const [editRequestNote, setEditRequestNote] = useState('');
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [violationReason, setViolationReason] = useState('');
+  // UC-15 / B13: phân loại vi phạm gửi kèm khi từ chối — BE lưu vào field riêng violationType.
+  const [violationType, setViolationType] = useState<string>('DAO_VAN');
 
   // States cho Yêu cầu mở lại chấm điểm
   const [showReopenModal, setShowReopenModal] = useState(false);
@@ -271,7 +273,9 @@ export default function GradingWorkshop() {
       await teacherService.updateSubmissionStatus(submissionId, {
         status: 'TU_CHOI',
         rejectReason: violationReason,
-        note: `Bài nộp bị từ chối do vi phạm: ${violationReason}`,
+        // UC-15 / B13: gửi violationType riêng để BE phân loại + trigger notify thay vì parse JSON nhúng.
+        violationType,
+        note: `Bài nộp bị từ chối do vi phạm [${violationType}]: ${violationReason}`,
         version: submission ? submission.version : 1,
       });
       toast.error(`Bài nộp đã bị từ chối thành công.`);
@@ -693,6 +697,22 @@ export default function GradingWorkshop() {
               Từ chối bài nộp (Vi phạm)
             </h3>
             <p className="text-xs text-slate-500 font-semibold">Chỉ áp dụng khi bài nộp vi phạm nghiêm trọng quy chế đạo văn hoặc nộp rác. Bài nộp sẽ chuyển về trạng thái "Từ chối".</p>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Loại vi phạm</label>
+              <select
+                value={violationType}
+                onChange={(e) => setViolationType(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
+              >
+                <option value="DAO_VAN">Đạo văn / sao chép</option>
+                <option value="NOP_RAC">Nộp rác / không nghiêm túc</option>
+                <option value="TRE_HAN">Trễ hạn quá quy định</option>
+                <option value="KHONG_DUNG_DE_TAI">Không đúng đề tài</option>
+                <option value="CHO_KIEM_TRA">Chờ kiểm tra (cảnh báo)</option>
+                <option value="KHAC">Khác</option>
+              </select>
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Lý do từ chối cụ thể</label>

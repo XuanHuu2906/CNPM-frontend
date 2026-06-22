@@ -216,6 +216,8 @@ export const teacherService = {
       status: string;
       note?: string;
       rejectReason?: string;
+      // UC-15 / B13: phân loại vi phạm — BE lưu vào field violationType.
+      violationType?: string;
       editRequestNote?: string;
       version: number; // Phiên bản của bài nộp (Submission version) để bảo vệ OCC
     }

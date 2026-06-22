@@ -167,6 +167,16 @@ export default function TeacherStatistics() {
       csvContent += `"${d.label}",${d.count} nhóm,${d.percentage}%\n`;
     });
 
+    // UC-11: bổ sung bảng chi tiết kèm tên đề tài để bảng điểm xuất ra không bị thiếu cột này (B/TS-BE-1).
+    csvContent += `\nCHI TIẾT BÀI NỘP THEO NHÓM\n`;
+    csvContent += `Tên nhóm,Tên đề tài,Trạng thái,Điểm cuối\n`;
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    groups.forEach((g: any) => {
+      const sub = submissions.find((s: any) => s.groupId === g.id);
+      const score = sub?.grades?.[0]?.finalScore ?? '';
+      csvContent += `${escape(g.name)},${escape(g.topicName || 'Chưa có')},${escape(sub?.status || 'CHUA_NOP')},${escape(score)}\n`;
+    });
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
