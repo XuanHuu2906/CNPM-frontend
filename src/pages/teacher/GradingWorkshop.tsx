@@ -47,6 +47,7 @@ export default function GradingWorkshop() {
     members: string[];
     version: number;
     classId: string;
+    readOnly?: boolean;
   } | null;
 
   const { submissionId, groupName, topic, members, classId } = stateData || {
@@ -317,8 +318,23 @@ export default function GradingWorkshop() {
     return `http://localhost:5000/${path.replace(/\\/g, '/')}`; // Hỗ trợ dev local
   };
 
-  const isReadOnly = stateData?.readOnly === true ||
-    (submission && ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(submission.status));
+  const triggerConflictError = () => {
+    toast.error('Dữ liệu đã bị người khác thay đổi. Vui lòng tải lại trang để xem phiên bản mới nhất.', {
+      duration: 8000,
+      action: {
+        label: 'Tải lại',
+        onClick: () => window.location.reload(),
+      },
+    });
+  };
+
+  useEffect(() => {
+    window.addEventListener('conflictError', triggerConflictError);
+    return () => window.removeEventListener('conflictError', triggerConflictError);
+  }, []);
+
+  const isReadOnly: boolean = stateData?.readOnly === true ||
+    Boolean(submission && ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(submission.status));
 
   if (!stateData) {
     return <GradingList />;

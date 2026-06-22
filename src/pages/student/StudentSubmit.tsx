@@ -102,7 +102,7 @@ export default function StudentSubmit() {
       setError(null);
       if (!profile) return;
 
-      const subData: SubmissionDetail = await studentService.getMySubmission();
+      const subData: SubmissionDetail = await studentService.getMySubmission(profile?.student?.classId);
       setSubmission(subData);
 
       if (subData) {

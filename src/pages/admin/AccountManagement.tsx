@@ -196,6 +196,7 @@ export default function AccountManagement() {
   const handleExecuteStatusChange = async () => {
     if (!confirmAction) return;
     const { type, accountId, accountName } = confirmAction;
+    if (!accountId) return;
     const account = accounts.find(a => a.id === accountId);
     if (!account) return;
 

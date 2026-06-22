@@ -11,8 +11,10 @@ export const studentService = {
     return response.data.data;
   },
 
-  getMySubmission: async () => {
-    const response = await apiClient.get('/submissions/my');
+  getMySubmission: async (classId?: string) => {
+    const response = await apiClient.get('/submissions/my', {
+      params: classId ? { classId } : undefined,
+    });
     return response.data.data;
   },
 
