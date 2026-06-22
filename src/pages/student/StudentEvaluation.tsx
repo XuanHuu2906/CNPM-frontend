@@ -29,7 +29,7 @@ export default function StudentEvaluation() {
       setError(null);
       if (!profile || profile.role !== 'SINH_VIEN') return;
 
-      const subData: SubmissionDetail = await studentService.getMySubmission();
+      const subData: SubmissionDetail = await studentService.getMySubmission(profile?.student?.classId);
       setSubmission(subData);
 
 

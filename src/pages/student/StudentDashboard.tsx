@@ -42,7 +42,7 @@ export default function StudentDashboard() {
           promises.push(studentService.getGroup(groupId).then(setGroup));
         }
         promises.push(
-          studentService.getMySubmission().then(setSubmission)
+          studentService.getMySubmission(profile.student?.classId).then(setSubmission)
         );
 
         await Promise.all(promises);

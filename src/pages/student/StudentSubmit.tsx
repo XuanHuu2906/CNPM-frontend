@@ -102,7 +102,7 @@ export default function StudentSubmit() {
       setError(null);
       if (!profile) return;
 
-      const subData: SubmissionDetail = await studentService.getMySubmission();
+      const subData: SubmissionDetail = await studentService.getMySubmission(profile?.student?.classId);
       setSubmission(subData);
 
       if (subData) {
@@ -373,10 +373,19 @@ export default function StudentSubmit() {
             <span className="text-indigo-600 dark:text-indigo-400">Báo cáo Môn học / Đồ án</span>
           </div>
           <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
-            Khu vực nộp báo cáo
+            {/* UC-03 vs UC-04: heading động để SV phân biệt rõ ngữ cảnh nộp */}
+            {status === 'YEU_CAU_SUA'
+              ? 'Nộp lại báo cáo theo yêu cầu sửa'
+              : status === 'CHUA_NOP'
+                ? 'Nộp báo cáo lần đầu'
+                : 'Khu vực bài nộp của bạn'}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-1">
-            Đồ án / Báo cáo môn học {termName} - Ngành Kỹ thuật Phần mềm
+            {status === 'YEU_CAU_SUA'
+              ? 'Giảng viên đã yêu cầu chỉnh sửa — vui lòng tải lên phiên bản mới để thay thế bài cũ.'
+              : status === 'CHUA_NOP'
+                ? `Đồ án / Báo cáo môn học ${termName}. Hãy chuẩn bị kỹ trước khi gửi — sau khi nộp bạn phải gửi yêu cầu nộp lại nếu muốn chỉnh.`
+                : `Bài nộp đang ở trạng thái "${status}". Muốn chỉnh sửa? Gửi yêu cầu nộp lại cho giảng viên.`}
           </p>
         </div>
 
@@ -620,7 +629,7 @@ export default function StudentSubmit() {
                     }`}
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Nộp báo cáo
+                  {status === 'YEU_CAU_SUA' ? 'Nộp lại báo cáo' : 'Nộp báo cáo'}
                 </button>
               </>
             )}

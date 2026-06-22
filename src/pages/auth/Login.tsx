@@ -31,6 +31,13 @@ export default function Login() {
       // Save session
       login(token, user);
 
+      // UC-13: nếu BE đánh dấu mustChangePassword, ép sang trang đổi mật khẩu trước khi vào dashboard.
+      if (user.mustChangePassword) {
+        toast.warning('Tài khoản đang dùng mật khẩu mặc định. Vui lòng đổi mật khẩu trước khi tiếp tục.');
+        navigate('/change-password', { replace: true });
+        return;
+      }
+
       toast.success(`Đăng nhập thành công! Chào mừng ${user.fullName}`);
 
       // Redirect to role-specific dashboard
