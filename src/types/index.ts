@@ -4,6 +4,13 @@
 
 export type Role = 'SINH_VIEN' | 'GIANG_VIEN' | 'PHONG_DAO_TAO' | 'ADMIN';
 
+export type AssignmentType = 'CA_NHAN' | 'NHOM';
+
+export const ASSIGNMENT_TYPE_LABEL: Record<AssignmentType, string> = {
+  CA_NHAN: 'Cá nhân',
+  NHOM: 'Nhóm',
+};
+
 export interface User {
   id: string; // Map từ NguoiDungID (chuỗi để dễ scale)
   email: string;
@@ -195,23 +202,6 @@ export interface BaoCaoEntity {
   NgayTao: string;
 }
 
-// Entity đại diện cho bảng FileBaoCao trong DB
-export interface FileBaoCaoEntity {
-  FileID: number;
-  BaoCaoID: number;
-  LanNop: number;
-  LoaiFile: 'BAO_CAO_CHINH' | 'MINH_CHUNG' | 'DINH_KEM';
-  TenFile: string;
-  DinhDangFile: string;
-  DungLuongByte: number;
-  DuongDanLuuTru: string;
-  HashFile?: string | null;
-  NgayNop: string;
-  NguoiNop: number;
-  IsHienTai: boolean;
-}
-
-
 // ==========================================
 // 5. RUBRIC & CHẤM ĐIỂM (RUBRICS & EVALUATION)
 // ==========================================
@@ -252,17 +242,6 @@ export interface ChamDiemEntity {
   NgayBatDau: string;
   NgayXacNhan?: string | null;
 }
-
-// Entity đại diện cho bảng DiemTheoTieuChi trong DB
-export interface DiemTheoTieuChiEntity {
-  DiemTieuChiID: number;
-  ChamDiemID: number;
-  TieuChiID: number;
-  DiemNhap: number;
-  NhanXet?: string | null;
-  NgayNhap: string;
-}
-
 
 // ==========================================
 // 6. YÊU CẦU SỬA, THẢO LUẬN & THÔNG BÁO (COLLABORATION)

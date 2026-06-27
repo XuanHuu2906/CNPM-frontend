@@ -36,12 +36,13 @@ import AcademicDashboard from './pages/academic/AcademicDashboard';
 import AcademicApprovals from './pages/academic/AcademicApprovals';
 import AcademicAssignment from './pages/academic/AcademicAssignment';
 import AcademicTerms from './pages/academic/AcademicTerms';
+import AcademicClassImport from './pages/academic/AcademicClassImport';
+import AcademicStudentImport from './pages/academic/AcademicStudentImport';
 import GradingReopenRequests from './pages/academic/GradingReopenRequests';
 
 // Admin Layout & Pages
 import AdminLayout from './layouts/AdminLayout';
 import AccountManagement from './pages/admin/AccountManagement';
-import BatchImporter from './pages/admin/BatchImporter';
 import SystemAuditTrail from './pages/admin/SystemAuditTrail';
 import SystemSettings from './pages/admin/SystemSettings';
 import DataBackupRestore from './pages/admin/DataBackupRestore';
@@ -119,6 +120,8 @@ function App() {
                                     <Route path="approvals" element={<AcademicApprovals />} />
                                     <Route path="assignment" element={<AcademicAssignment />} />
                                     <Route path="terms" element={<AcademicTerms />} />
+                                    <Route path="class-import" element={<AcademicClassImport />} />
+                                    <Route path="student-import" element={<AcademicStudentImport />} />
                                     <Route path="reopen-requests" element={<GradingReopenRequests />} />
                                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                                 </Route>
@@ -127,7 +130,6 @@ function App() {
                                 <Route path="admin" element={<PrivateRoute><RoleRoute roles={['ADMIN']}><AdminLayout /></RoleRoute></PrivateRoute>}>
                                     <Route index element={<Navigate to="accounts" replace />} />
                                     <Route path="accounts" element={<AccountManagement />} />
-                                    <Route path="importer" element={<BatchImporter />} />
                                     <Route path="monitoring" element={<ProgressMonitoring />} />
                                     <Route path="audit" element={<SystemAuditTrail />} />
                                     <Route path="backup" element={<DataBackupRestore />} />

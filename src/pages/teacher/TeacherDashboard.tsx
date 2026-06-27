@@ -34,6 +34,29 @@ export default function TeacherDashboard() {
   // Modal State cho Xem chi tiết
   const [selectedGroupDetails, setSelectedGroupDetails] = useState<any>(null);
 
+  // UC-16 (BATCH): trạng thái gửi duyệt cả lớp.
+  const [submittingClass, setSubmittingClass] = useState(false);
+  const handleSubmitClassForReview = async () => {
+    if (!selectedClass) return;
+    const ready = submissions.filter(s => s.status === 'DA_CHAM');
+    if (ready.length === 0) return;
+    const ok = window.confirm(`Gửi ${ready.length} bài đã chấm xong của lớp sang Phòng Đào tạo duyệt?`);
+    if (!ok) return;
+    try {
+      setSubmittingClass(true);
+      const res = await teacherService.submitClassForReview(selectedClass);
+      const skippedNote = res.skippedCount > 0 ? ` (bỏ qua ${res.skippedCount})` : '';
+      toast.success(`Đã gửi ${res.movedCount} bài sang Chờ duyệt${skippedNote}.`);
+      const data = await teacherService.getClassSubmissions(selectedClass);
+      setSubmissions(data);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err.message;
+      toast.error(`Không gửi duyệt được: ${msg}`);
+    } finally {
+      setSubmittingClass(false);
+    }
+  };
+
   // Lấy danh sách lớp phân công từ profile giáo viên khi mount
   useEffect(() => {
     const fetchProfile = async () => {
@@ -264,6 +287,28 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+
+      {/* UC-16 (BATCH): GV gửi duyệt cả lớp — chỉ enable khi có >=1 bài DA_CHAM. */}
+      {submissions.length > 0 && (() => {
+        const ready = submissions.filter(s => s.status === 'DA_CHAM');
+        return (
+          <div className="bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="text-left">
+              <h4 className="text-sm font-extrabold text-indigo-700 dark:text-indigo-300">Gửi cả lớp lên Phòng Đào tạo duyệt</h4>
+              <p className="text-[11px] font-semibold text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
+                Khi đã chấm xong các bài đủ điều kiện, gửi tất cả {ready.length} bài Đã chấm sang Chờ duyệt trong 1 thao tác.
+              </p>
+            </div>
+            <button
+              disabled={ready.length === 0 || submittingClass}
+              onClick={handleSubmitClassForReview}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/15 cursor-pointer transition-all shrink-0"
+            >
+              {submittingClass ? 'Đang gửi…' : `Gửi duyệt ${ready.length} bài`}
+            </button>
+          </div>
+        );
+      })()}
 
       {/* FILTER & SEARCH CONTROL BLOCK */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm flex flex-col md:flex-row items-center gap-4">

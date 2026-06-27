@@ -16,12 +16,21 @@ import { toast } from 'sonner';
 import { studentService } from '../../services/studentService';
 import { useProfile } from '../../hooks/useProfile';
 import type { SubmissionDetail } from '../../types';
+import apiClient from '../../services/apiClient';
 
 export default function StudentEvaluation() {
   const { data: profile, isPending: profileLoading } = useProfile();
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // UC-09 / UC-I05 EXT: điểm cá nhân (groupScore × hệ số đóng góp) cho bài nhóm.
+  const [personalBreakdown, setPersonalBreakdown] = useState<{
+    groupScore: number;
+    contributionFactor: number;
+    personalScore: number;
+    note: string | null;
+  } | null>(null);
 
   const loadEvaluationData = async () => {
     try {
@@ -32,7 +41,28 @@ export default function StudentEvaluation() {
       const subData: SubmissionDetail = await studentService.getMySubmission(profile?.student?.classId);
       setSubmission(subData);
 
-
+      // UC-09 / UC-I05 EXT: nếu bài đã HOAN_THANH và là bài nhóm, lấy điểm cá nhân.
+      if ((subData as any)?.id && (subData as any)?.status === 'HOAN_THANH' && (subData as any)?.groupId) {
+        try {
+          const res = await apiClient.get(`/grades/submission/${(subData as any).id}/with-adjustments`);
+          const data = res.data?.data;
+          if (data && Array.isArray(data.members) && data.members.length > 0) {
+            const me = data.members[0];
+            setPersonalBreakdown({
+              groupScore: Number(data.groupScore),
+              contributionFactor: Number(me.contributionFactor),
+              personalScore: Number(me.personalScore),
+              note: me.note ?? null,
+            });
+          } else {
+            setPersonalBreakdown(null);
+          }
+        } catch {
+          setPersonalBreakdown(null);
+        }
+      } else {
+        setPersonalBreakdown(null);
+      }
     } catch (error) {
       console.error('Lỗi tải dữ liệu đánh giá:', error);
       setError('Không thể tải dữ liệu đánh giá. Vui lòng thử lại.');
@@ -254,6 +284,25 @@ export default function StudentEvaluation() {
 
       {/* CONTENT ROW */}
       <div className="space-y-8 max-w-5xl mx-auto">
+
+        {/* UC-09 / UC-I05 EXT: hiển thị điểm cá nhân nếu bài nhóm có điều chỉnh hệ số đóng góp. */}
+        {personalBreakdown && Math.abs(personalBreakdown.contributionFactor - 1) > 1e-6 && (
+          <div className="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/20 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="text-left space-y-1">
+              <h4 className="text-sm font-extrabold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Điểm cá nhân theo hệ số đóng góp</h4>
+              <p className="text-xs text-indigo-700/80 dark:text-indigo-300/80 font-semibold">
+                Điểm nhóm <strong>{personalBreakdown.groupScore.toFixed(2)}</strong> × Hệ số <strong>{personalBreakdown.contributionFactor.toFixed(2)}</strong> = Điểm cá nhân <strong>{personalBreakdown.personalScore.toFixed(2)}</strong>
+              </p>
+              {personalBreakdown.note && (
+                <p className="text-[11px] italic text-indigo-700/70 dark:text-indigo-300/70">Ghi chú từ GV: "{personalBreakdown.note}"</p>
+              )}
+            </div>
+            <div className="text-center bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900 rounded-xl px-4 py-2 shrink-0">
+              <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 leading-none">{personalBreakdown.personalScore.toFixed(1)}</span>
+              <div className="text-[9px] font-extrabold text-indigo-600/70 dark:text-indigo-400/70 uppercase tracking-widest mt-0.5">Điểm cá nhân</div>
+            </div>
+          </div>
+        )}
 
         {/* Score Dial Summary Card */}
         <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg shadow-slate-100/50 dark:shadow-none rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-8">

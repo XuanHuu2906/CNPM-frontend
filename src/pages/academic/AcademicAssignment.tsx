@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { 
-  GitPullRequest, 
-  UserPlus, 
-  Lock, 
-  Unlock, 
-  Shuffle, 
-  Search, 
+  GitPullRequest,
+  UserPlus,
+  Lock,
+  Unlock,
+  Search,
   MapPin, 
   Clock, 
   AlertTriangle, 
@@ -21,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { academicService } from '../../services/academicService';
 import { adminService } from '../../services/adminService';
+import { ASSIGNMENT_TYPE_LABEL, type AssignmentType } from '../../types';
 
 interface CourseClass {
   id: string;
@@ -30,10 +30,11 @@ interface CourseClass {
   termId: string;
   department: string;
   registeredStudents: number;
-  lecturer: string | null; 
+  lecturer: string | null;
   lecturerId: string | null;
   room: string;
   schedule: string;
+  assignmentType: AssignmentType;
 }
 
 interface TeacherOption {
@@ -84,10 +85,6 @@ export default function AcademicAssignment() {
   const [targetLecturerId, setTargetLecturerId] = useState('');
   const [isReassigning, setIsReassigning] = useState(false);
   const [adjustmentReason, setAdjustmentReason] = useState('');
-
-  // States phục vụ Đề xuất Phân công
-  const [isRecommendModalOpen, setIsRecommendModalOpen] = useState(false);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
 
   // Nhật ký điều phối (Lưu trữ trong LocalStorage)
   const [assignmentLogs, setAssignmentLogs] = useState<any[]>(() => {
@@ -166,7 +163,8 @@ export default function AcademicAssignment() {
           lecturer: assignments[0]?.teacher?.user?.fullName || null,
           lecturerId: assignments[0]?.teacher?.id || null,
           room: '—',
-          schedule: '—'
+          schedule: '—',
+          assignmentType: (cls.assignmentType === 'CA_NHAN' ? 'CA_NHAN' : 'NHOM') as AssignmentType,
         };
       });
 
@@ -311,6 +309,22 @@ export default function AcademicAssignment() {
     }
   };
 
+  const handleChangeAssignmentType = async (cls: CourseClass, next: AssignmentType) => {
+    if (cls.assignmentType === next) return;
+    if (isSemesterLocked) {
+      toast.error('Học kỳ đã khóa — không thể đổi loại phân công');
+      return;
+    }
+    try {
+      toast.loading('Đang cập nhật loại phân công...', { id: `aType-${cls.id}` });
+      await academicService.setClassAssignmentType(cls.id, next);
+      setCourseClasses(prev => prev.map(p => p.id === cls.id ? { ...p, assignmentType: next } : p));
+      toast.success(`Đã đổi sang "${ASSIGNMENT_TYPE_LABEL[next]}"`, { id: `aType-${cls.id}` });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Không thể đổi loại phân công', { id: `aType-${cls.id}` });
+    }
+  };
+
   // Mở Modal Phân công
   const handleOpenAssignModal = (cls: CourseClass) => {
     if (isSemesterLocked) {
@@ -337,198 +351,93 @@ export default function AcademicAssignment() {
       return;
     }
 
+    if (adjustmentReason.trim().length < 5) {
+      toast.error('Lý do điều chỉnh phải có ít nhất 5 ký tự');
+      return;
+    }
+
     try {
       toast.loading('Đang ghi nhận dữ liệu phân công...', { id: 'assign-action' });
 
-      // Nếu đã có phân công trước đó, tiến hành xóa (unassign) trước khi gán mới
       const previousLecturerId = selectedClassForAssign.lecturerId;
       const previousLecturerName = selectedClassForAssign.lecturer;
-
-      if (previousLecturerId && previousLecturerId !== targetLecturerId) {
-        try {
-          await academicService.unassignTeacher(selectedClassForAssign.id, previousLecturerId);
-        } catch (err) {
-          // Bỏ qua lỗi nếu bản ghi cũ không tìm thấy
-        }
-      }
-
-      // Thêm phân công mới
-      await academicService.assignTeacher({
-        classId: selectedClassForAssign.id,
-        teacherId: targetLecturerId
-      });
-
       const selectedTeacherName = availableLecturers.find(l => l.id === targetLecturerId)?.name || 'Giảng viên';
+
+      let actionText = '';
+      let bannerToast = '';
+
+      if (previousLecturerId) {
+        // UC-17: đổi GV phụ trách giữa kỳ — 1 endpoint, giữ điểm nháp của GV cũ.
+        const res = await academicService.changeClassTeacher(selectedClassForAssign.id, {
+          newTeacherId: targetLecturerId,
+          reason: adjustmentReason.trim(),
+        });
+        actionText = `Đã đổi GV phụ trách lớp ${selectedClassForAssign.code} từ ${previousLecturerName ?? '?'} sang ${selectedTeacherName}.`;
+        bannerToast = res.inProgressCount > 0
+          ? `Đổi GV thành công — bàn giao ${res.inProgressCount} bài đang chấm dở.`
+          : 'Đổi GV phụ trách thành công.';
+      } else {
+        await academicService.assignTeacher({
+          classId: selectedClassForAssign.id,
+          teacherId: targetLecturerId,
+        });
+        actionText = `Đã phân công GV chấm chính ${selectedTeacherName} cho lớp ${selectedClassForAssign.code}.`;
+        bannerToast = 'Phân công GV chấm chính thành công.';
+      }
 
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const dateStr = now.toLocaleDateString('vi-VN');
-
-      let actionText = '';
-      if (previousLecturerId && previousLecturerName) {
-        actionText = `Đã đổi giảng viên chấm chính lớp ${selectedClassForAssign.code} từ ${previousLecturerName} sang ${selectedTeacherName}.`;
-      } else {
-        actionText = `Đã phân công giảng viên chấm chính ${selectedTeacherName} cho lớp ${selectedClassForAssign.code}.`;
-      }
 
       const newLog = {
         time: timeStr,
         date: dateStr,
         user: 'Phòng đào tạo',
         action: actionText,
-        reason: adjustmentReason
+        reason: adjustmentReason.trim()
       };
       setAssignmentLogs([newLog, ...assignmentLogs]);
 
-      toast.success(previousLecturerId ? `Đã thay đổi giảng viên chấm chính thành công!` : `Đã phân công giảng viên chấm chính thành công!`, { id: 'assign-action' });
+      toast.success(bannerToast, { id: 'assign-action' });
       setSelectedClassForAssign(null);
 
-      // Reload bảng
       loadData();
     } catch (error: any) {
-      toast.error(`Không thể thực thi phân công: ${error.message}`, { id: 'assign-action' });
+      const msg = error?.response?.data?.message || error?.message || 'Không rõ lỗi';
+      toast.error(`Không thể thực thi phân công: ${msg}`, { id: 'assign-action' });
     }
   };
 
-  // Tính toán Đề xuất phân công hợp lệ (không lưu ngay xuống Postgres)
-  const handleGenerateRecommendations = () => {
-    if (isSemesterLocked) {
-      toast.error('Chặn Tác vụ! Học kỳ đã bị khóa kết quả bảo mật.');
+  // UC-17: lịch sử thay đổi GV theo lớp (load on-demand khi mở modal).
+  const [classHistory, setClassHistory] = useState<Array<{
+    id: string;
+    createdAt: string;
+    reason: string;
+    oldTeacher: { user: { fullName: string } };
+    newTeacher: { user: { fullName: string } };
+    changedBy: { fullName: string };
+  }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedClassForAssign) {
+      setClassHistory([]);
       return;
     }
-
-    if (courseClasses.length === 0 || availableLecturers.length === 0) {
-      toast.warning('Không có dữ liệu hợp lệ để đề xuất.');
-      return;
-    }
-
-    // Lọc các lớp chưa được phân bổ giảng viên
-    const classesToAssign = courseClasses.filter(c => !c.lecturerId);
-
-    if (classesToAssign.length === 0) {
-      toast.info('Tất cả các lớp đã được phân bổ giảng viên đầy đủ!');
-      return;
-    }
-
-    const tempLecturers = availableLecturers.map(t => ({ ...t }));
-    const calculatedRecommendations: any[] = [];
-
-    for (const cls of classesToAssign) {
-      // Tìm giảng viên phù hợp bộ môn và có tải trọng thấp nhất
-      const eligibleTeachers = tempLecturers
-        .filter(t => t.dept === cls.department)
-        .sort((a, b) => a.currentLoad - b.currentLoad);
-
-      if (eligibleTeachers.length > 0) {
-        const primaryTeacher = eligibleTeachers[0];
-        primaryTeacher.currentLoad++; // Cộng dồn tải trọng giả định để phân bổ tiếp theo
-        
-        calculatedRecommendations.push({
-          classId: cls.id,
-          classCode: cls.code,
-          subject: cls.subject,
-          department: cls.department,
-          teacherId: primaryTeacher.id,
-          teacherName: primaryTeacher.name,
-          reason: 'Phân công đề xuất tự động theo tải trọng giảng viên'
-        });
+    let cancelled = false;
+    (async () => {
+      try {
+        setHistoryLoading(true);
+        const data = await academicService.getClassAssignmentHistory(selectedClassForAssign.id);
+        if (!cancelled) setClassHistory(data as any);
+      } catch {
+        if (!cancelled) setClassHistory([]);
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
       }
-    }
-
-    if (calculatedRecommendations.length === 0) {
-      toast.info('Không tìm thấy đề xuất giảng viên phù hợp cho các lớp chưa phân công.');
-      return;
-    }
-
-    setRecommendations(calculatedRecommendations);
-    setIsRecommendModalOpen(true);
-  };
-
-  // Áp dụng đề xuất đơn lẻ
-  const handleApplySingleRecommendation = async (index: number) => {
-    const rec = recommendations[index];
-    try {
-      toast.loading(`Đang phân công lớp ${rec.classCode}...`, { id: `rec-apply-${index}` });
-      await academicService.assignTeacher({
-        classId: rec.classId,
-        teacherId: rec.teacherId
-      });
-
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const dateStr = now.toLocaleDateString('vi-VN');
-
-      const newLog = {
-        time: timeStr,
-        date: dateStr,
-        user: 'Phòng đào tạo',
-        action: `Đã đề xuất và phân công giảng viên chấm chính ${rec.teacherName} cho lớp ${rec.classCode}.`,
-        reason: rec.reason
-      };
-
-      setAssignmentLogs(prev => [newLog, ...prev]);
-      toast.success(`Đã áp dụng thành công lớp ${rec.classCode}`, { id: `rec-apply-${index}` });
-
-      const updated = [...recommendations];
-      updated.splice(index, 1);
-      setRecommendations(updated);
-
-      if (updated.length === 0) {
-        setIsRecommendModalOpen(false);
-      }
-
-      loadData();
-    } catch (error: any) {
-      toast.error(`Lỗi phân công lớp ${rec.classCode}: ${error.message}`, { id: `rec-apply-${index}` });
-    }
-  };
-
-  // Áp dụng đồng loạt tất cả đề xuất
-  const handleApplyAllRecommendations = async () => {
-    if (recommendations.length === 0) return;
-
-    try {
-      toast.loading('Đang áp dụng đồng loạt đề xuất phân công...', { id: 'rec-apply-all' });
-      let successCount = 0;
-      const newLogs: any[] = [];
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const dateStr = now.toLocaleDateString('vi-VN');
-
-      for (const rec of recommendations) {
-        try {
-          await academicService.assignTeacher({
-            classId: rec.classId,
-            teacherId: rec.teacherId
-          });
-          successCount++;
-          newLogs.push({
-            time: timeStr,
-            date: dateStr,
-            user: 'Phòng đào tạo',
-            action: `Đã đề xuất và phân công giảng viên chấm chính ${rec.teacherName} cho lớp ${rec.classCode}.`,
-            reason: rec.reason
-          });
-        } catch (err) {
-          // Bỏ qua nếu có lớp lỗi
-        }
-      }
-
-      setAssignmentLogs(prev => [...newLogs, ...prev]);
-      toast.success(`Đã áp dụng thành công ${successCount}/${recommendations.length} đề xuất!`, { id: 'rec-apply-all' });
-      setIsRecommendModalOpen(false);
-      setRecommendations([]);
-      loadData();
-    } catch (error: any) {
-      toast.error(`Lỗi khi áp dụng đề xuất: ${error.message}`, { id: 'rec-apply-all' });
-    }
-  };
-
-  const handleRecommendationReasonChange = (index: number, newReason: string) => {
-    const updated = [...recommendations];
-    updated[index] = { ...updated[index], reason: newReason };
-    setRecommendations(updated);
-  };
+    })();
+    return () => { cancelled = true; };
+  }, [selectedClassForAssign]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-left">
@@ -702,18 +611,6 @@ export default function AcademicAssignment() {
             )}
           </div>
 
-          <button
-            onClick={handleGenerateRecommendations}
-            disabled={isSemesterLocked}
-            className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto ${
-              isSemesterLocked
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border shadow-none'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10'
-            }`}
-          >
-            <Shuffle className="w-4 h-4 shrink-0" />
-            Đề xuất phân công
-          </button>
         </div>
 
         {/* COLLAPSIBLE ADVANCED FILTERS PANEL */}
@@ -822,6 +719,7 @@ export default function AcademicAssignment() {
                     <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider bg-slate-50/20 dark:bg-slate-950/10">
                       <th className="py-4 px-5">Mã & Môn học</th>
                       <th className="py-4 px-4">Thông tin lớp</th>
+                      <th className="py-4 px-4">Loại phân công</th>
                       <th className="py-4 px-4">Giảng viên chấm chính</th>
                       <th className="py-4 px-4 text-center">Thao tác</th>
                     </tr>
@@ -846,6 +744,23 @@ export default function AcademicAssignment() {
                             <Clock className="w-3.5 h-3.5 shrink-0" />
                             <span>{c.schedule}</span>
                           </div>
+                        </td>
+
+                        <td className="py-4 px-4 text-left">
+                          <select
+                            value={c.assignmentType}
+                            onChange={(e) => handleChangeAssignmentType(c, e.target.value as AssignmentType)}
+                            disabled={isSemesterLocked}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border focus:outline-none cursor-pointer transition-all ${
+                              c.assignmentType === 'CA_NHAN'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            } disabled:opacity-60 disabled:cursor-not-allowed`}
+                            title="Đổi sẽ bị từ chối nếu lớp đã có nhóm/đề tài"
+                          >
+                            <option value="NHOM">Nhóm</option>
+                            <option value="CA_NHAN">Cá nhân</option>
+                          </select>
                         </td>
 
                         {/* Primary Lecturer */}
@@ -1023,6 +938,35 @@ export default function AcademicAssignment() {
               />
             </div>
 
+            {/* UC-17: Lịch sử thay đổi GV của lớp (đọc từ AssignmentHistory) */}
+            {selectedClassForAssign.lecturerId && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider block">
+                  Lịch sử thay đổi GV phụ trách
+                </label>
+                <div className="max-h-32 overflow-y-auto rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 p-2 text-[11px] font-semibold text-slate-600 dark:text-slate-400 space-y-1.5">
+                  {historyLoading ? (
+                    <span className="italic">Đang tải lịch sử…</span>
+                  ) : classHistory.length === 0 ? (
+                    <span className="italic">Chưa có lần đổi GV nào.</span>
+                  ) : (
+                    classHistory.map((h) => (
+                      <div key={h.id} className="border-b border-dashed border-slate-200/80 dark:border-slate-800 pb-1.5 last:border-0">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-extrabold uppercase">
+                          <span>{new Date(h.createdAt).toLocaleString('vi-VN')}</span>
+                          <span>PĐT: {h.changedBy?.fullName ?? '?'}</span>
+                        </div>
+                        <div className="text-slate-700 dark:text-slate-300">
+                          {h.oldTeacher?.user?.fullName ?? '?'} → <strong>{h.newTeacher?.user?.fullName ?? '?'}</strong>
+                        </div>
+                        <div className="italic text-slate-500 dark:text-slate-400">Lý do: "{h.reason}"</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setSelectedClassForAssign(null)}
@@ -1035,83 +979,6 @@ export default function AcademicAssignment() {
                 className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md cursor-pointer"
               >
                 Xác nhận phân công
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RECOMMENDATION PREVIEW MODAL */}
-      {isRecommendModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl p-6 space-y-4 animate-in zoom-in-95 duration-200 text-left text-slate-800 dark:text-slate-100 max-h-[90vh] flex flex-col">
-            <div className="shrink-0 space-y-1">
-              <h3 className="text-lg font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                <Shuffle className="w-5 h-5 shrink-0" />
-                Đề xuất Phân công Giảng viên Chấm Báo cáo
-              </h3>
-              <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                Hệ thống tự động đề xuất giảng viên phù hợp nhất dựa trên bộ môn và tải trọng giảng dạy tối thiểu. Hãy kiểm tra, chỉnh sửa lý do và xác nhận để áp dụng.
-              </p>
-            </div>
-
-            {/* Recommendations List Container */}
-            <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 my-2 min-h-[200px] scrollbar-thin">
-              {recommendations.map((rec, index) => (
-                <div key={index} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-150/40 dark:border-slate-850 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 rounded text-[9px] font-extrabold">
-                        {rec.classCode}
-                      </span>
-                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">{rec.subject}</span>
-                      <span className="text-[10px] text-slate-400 font-bold">({rec.department})</span>
-                    </div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">
-                      Đề xuất giảng viên: <span className="font-extrabold text-slate-800 dark:text-slate-200">{rec.teacherName}</span>
-                    </div>
-                  </div>
-
-                  {/* Inline Reason Edit */}
-                  <div className="flex-1 min-w-[240px]">
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black block mb-1">Lý do phân công:</span>
-                    <input
-                      type="text"
-                      value={rec.reason}
-                      onChange={(e) => handleRecommendationReasonChange(index, e.target.value)}
-                      placeholder="Nhập lý do phân công..."
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-350 focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Individual Apply Action */}
-                  <div className="shrink-0 flex items-center">
-                    <button
-                      onClick={() => handleApplySingleRecommendation(index)}
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer"
-                    >
-                      Áp dụng
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="shrink-0 flex justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button
-                onClick={() => {
-                  setIsRecommendModalOpen(false);
-                  setRecommendations([]);
-                }}
-                className="px-4 py-2.5 text-xs font-bold border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 cursor-pointer text-slate-600 dark:text-slate-400"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleApplyAllRecommendations}
-                className="px-4 py-2.5 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md cursor-pointer"
-              >
-                Áp dụng đồng loạt ({recommendations.length})
               </button>
             </div>
           </div>

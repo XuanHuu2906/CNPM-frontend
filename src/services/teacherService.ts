@@ -104,6 +104,12 @@ export interface Grade {
   feedback?: string;
   isApproved: boolean;
   version: number;
+  // UC-17 (R12): GV đã chấm nháp — có thể khác GV phụ trách lớp hiện tại nếu PĐT đã đổi GV.
+  teacher?: {
+    id: string;
+    teacherCode: string;
+    user: { fullName: string };
+  };
 }
 
 export const teacherService = {
@@ -128,6 +134,60 @@ export const teacherService = {
    */
   getClassSubmissions: async (classId: string): Promise<Submission[]> => {
     const response = await apiClient.get(`/submissions/class/${classId}`);
+    return response.data.data;
+  },
+
+  // UC-09 / UC-I05 EXT: điều chỉnh hệ số đóng góp thành viên nhóm.
+  setMemberAdjustments: async (
+    submissionId: string,
+    adjustments: Array<{ studentId: string; contributionFactor: number; note?: string }>,
+  ): Promise<{
+    submissionId: string;
+    groupId: string | null;
+    groupScore: number;
+    members: Array<{
+      studentId: string;
+      fullName: string | null;
+      studentCode: string | null;
+      contributionFactor: number;
+      note: string | null;
+      personalScore: number;
+    }>;
+  }> => {
+    const response = await apiClient.put(
+      `/grades/submission/${submissionId}/member-adjustments`,
+      { adjustments },
+    );
+    return response.data.data;
+  },
+
+  // Đọc bảng điểm kèm điểm cá nhân từng thành viên.
+  getGradeWithMemberScores: async (submissionId: string): Promise<{
+    submissionId: string;
+    groupId: string | null;
+    groupScore: number;
+    members: Array<{
+      studentId: string;
+      fullName: string | null;
+      studentCode: string | null;
+      contributionFactor: number;
+      note: string | null;
+      personalScore: number;
+    }>;
+  }> => {
+    const response = await apiClient.get(`/grades/submission/${submissionId}/with-adjustments`);
+    return response.data.data;
+  },
+
+  // UC-16 (BATCH): GV gửi duyệt cả lớp — chuyển mọi DA_CHAM trong lớp sang CHO_DUYET.
+  submitClassForReview: async (classId: string): Promise<{
+    classId: string;
+    movedCount: number;
+    skippedCount: number;
+    failedCount: number;
+    skipped: Array<{ submissionId: string; reason: string }>;
+  }> => {
+    const response = await apiClient.post(`/teacher/class-sections/${classId}/submit-for-review`);
     return response.data.data;
   },
 
@@ -226,12 +286,32 @@ export const teacherService = {
     return response.data.data;
   },
 
+  // ==========================================
+  // INTERNAL NOTES (B20: ghi chú nội bộ giảng viên)
+  // Chỉ GV/Admin/PĐT thấy, SV không bao giờ truy cập (R7-compliant).
+  // ==========================================
+
   /**
-   * Gửi thảo luận/bình luận mới cho bài nộp
+   * Thêm ghi chú nội bộ vào bài nộp (chỉ GV phụ trách lớp).
    */
-  addComment: async (submissionId: string, content: string): Promise<any> => {
-    const response = await apiClient.post(`/comments/submission/${submissionId}`, { content });
+  addInternalNote: async (submissionId: string, content: string): Promise<any> => {
+    const response = await apiClient.post(`/internal-notes/submission/${submissionId}`, { content });
     return response.data.data;
+  },
+
+  /**
+   * Lấy danh sách ghi chú nội bộ cho một bài nộp.
+   */
+  getInternalNotes: async (submissionId: string): Promise<any[]> => {
+    const response = await apiClient.get(`/internal-notes/submission/${submissionId}`);
+    return response.data.data;
+  },
+
+  /**
+   * Xoá (ẩn) một ghi chú nội bộ. Chỉ chủ ghi chú hoặc Admin được xoá.
+   */
+  deleteInternalNote: async (noteId: string): Promise<void> => {
+    await apiClient.delete(`/internal-notes/${noteId}`);
   },
 
   /**
@@ -312,9 +392,46 @@ export const teacherService = {
     return response.data.data;
   },
 
+  assignTopicToStudent: async (
+    classId: string,
+    payload: { studentId: string; topicName: string; description?: string },
+  ) => {
+    const response = await apiClient.post(
+      `/teacher/class-sections/${classId}/individual-assignments`,
+      payload,
+    );
+    return response.data.data;
+  },
+
   importGroupsBatch: async (classId: string, groups: { name: string, topicName?: string, studentCodes: string[] }[]) => {
     const response = await apiClient.post(`/teacher/class-sections/${classId}/groups/import`, { groups });
     return response.data.data;
+  },
+
+  importGroupsFromExcel: async (classId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post(
+      `/teacher/class-sections/${classId}/groups/import-excel`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data as {
+      classCode: string | null;
+      groupCount: number;
+      memberCount: number;
+      leaderCount: number;
+      createdUsersCount: number;
+      enrolledCount: number;
+      groups: Array<{
+        id: string;
+        groupNo: number;
+        name: string;
+        topicName: string;
+        memberCount: number;
+        leaderCode: string | null;
+      }>;
+    };
   },
 
   autoGenerateGroups: async (classId: string, targetSize: number) => {

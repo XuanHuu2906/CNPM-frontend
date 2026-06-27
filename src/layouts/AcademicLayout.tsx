@@ -23,6 +23,8 @@ import {
   CheckCircle2,
   Award,
   XCircle,
+  UploadCloud,
+  UserPlus,
   Calendar as CalendarIcon
 } from 'lucide-react';
 
@@ -113,6 +115,16 @@ export default function AcademicLayout() {
       title: 'Điều phối giảng dạy',
       path: '/academic/assignment',
       icon: Users
+    },
+    {
+      title: 'Nhập lớp từ Excel',
+      path: '/academic/class-import',
+      icon: UploadCloud
+    },
+    {
+      title: 'Nhập SV & Gửi tài khoản',
+      path: '/academic/student-import',
+      icon: UserPlus
     }
   ];
 

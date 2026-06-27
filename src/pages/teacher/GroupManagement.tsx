@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import {
   Users, UserPlus, FileText, Trash2, Edit3,
   RefreshCw, Plus, CheckCircle, Search,
-  Settings2, ChevronRight, Wand2, UploadCloud, Check, X
+  Settings2, ChevronRight, Wand2, UploadCloud, Check, X, Crown
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import * as XLSX from 'xlsx';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { teacherService } from '../../services/teacherService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ASSIGNMENT_TYPE_LABEL, type AssignmentType } from '../../types';
 
 export default function GroupManagement() {
   const [classes, setClasses] = useState<any[]>([]);
@@ -29,14 +29,55 @@ export default function GroupManagement() {
   const [newGroupTopic, setNewGroupTopic] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
-  // Excel import
+  // Excel import (parse trên backend, detect màu đỏ = nhóm trưởng)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importResult, setImportResult] = useState<{
+    classCode: string | null;
+    groupCount: number;
+    memberCount: number;
+    leaderCount: number;
+    createdUsersCount: number;
+    enrolledCount: number;
+    groups: Array<{ id: string; groupNo: number; name: string; topicName: string; memberCount: number; leaderCode: string | null }>;
+  } | null>(null);
   const [isProcessingImport, setIsProcessingImport] = useState(false);
 
   const [isAutoGroupModalOpen, setIsAutoGroupModalOpen] = useState(false);
   const [targetSize, setTargetSize] = useState(4);
+
+  // CA_NHAN flow — gán đề tài cho 1 SV
+  const [individualAssignTarget, setIndividualAssignTarget] = useState<{ id: string; fullName: string; studentCode: string } | null>(null);
+  const [individualTopicName, setIndividualTopicName] = useState('');
+  const [individualDescription, setIndividualDescription] = useState('');
+
+  const selectedClass = classes.find(c => c.id === selectedClassId);
+  const assignmentType: AssignmentType = (selectedClass?.assignmentType === 'CA_NHAN' ? 'CA_NHAN' : 'NHOM');
+  const isIndividualMode = assignmentType === 'CA_NHAN';
+
+  const handleSubmitIndividualAssignment = async () => {
+    if (!individualAssignTarget) return;
+    const topic = individualTopicName.trim();
+    if (!topic) {
+      toast.error('Tên đề tài không được để trống');
+      return;
+    }
+    try {
+      toast.loading('Đang gán đề tài...', { id: 'assign-topic-individual' });
+      await teacherService.assignTopicToStudent(selectedClassId, {
+        studentId: individualAssignTarget.id,
+        topicName: topic,
+        description: individualDescription.trim() || undefined,
+      });
+      toast.success(`Đã gán đề tài cho ${individualAssignTarget.fullName}`, { id: 'assign-topic-individual' });
+      setIndividualAssignTarget(null);
+      setIndividualTopicName('');
+      setIndividualDescription('');
+      loadClassData(selectedClassId);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message ?? error?.message, { id: 'assign-topic-individual' });
+    }
+  };
 
   const loadClasses = async () => {
     try {
@@ -138,63 +179,25 @@ export default function GroupManagement() {
 
   const onDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
-    const file = acceptedFiles[0];
-    setImportFile(file);
-    processExcelFile(file);
-  };
-
-  const processExcelFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const ab = e.target?.result as ArrayBuffer;
-        const workbook = XLSX.read(ab, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-        const groupMap = new Map<string, { name: string, topicName: string, studentCodes: Set<string> }>();
-
-        rows.forEach(row => {
-          const mssv = String(row['MSSV'] || '').trim();
-          const tenNhom = String(row['Tên nhóm'] || '').trim();
-          const deTai = String(row['Đề tài'] || '').trim();
-
-          if (!tenNhom || !mssv) return;
-
-          if (!groupMap.has(tenNhom)) {
-            groupMap.set(tenNhom, { name: tenNhom, topicName: deTai, studentCodes: new Set() });
-          }
-          groupMap.get(tenNhom)!.studentCodes.add(mssv);
-        });
-
-        const groupsArray = Array.from(groupMap.values()).map(g => ({
-          name: g.name,
-          topicName: g.topicName,
-          studentCodes: Array.from(g.studentCodes)
-        }));
-
-        setImportPreview(groupsArray);
-      } catch (err: any) {
-        toast.error('Lỗi khi đọc file Excel: ' + err.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    setImportFile(acceptedFiles[0]);
+    setImportResult(null);
   };
 
   const handleConfirmImport = async () => {
-    if (importPreview.length === 0) {
-      toast.error('Không tìm thấy dữ liệu hợp lệ trong file');
+    if (!importFile) {
+      toast.error('Vui lòng chọn file Excel');
       return;
     }
     try {
       setIsProcessingImport(true);
-      toast.loading('Đang import nhóm...', { id: 'import-group' });
-      await teacherService.importGroupsBatch(selectedClassId, importPreview);
-      toast.success('Import nhóm thành công', { id: 'import-group' });
-      setIsImportModalOpen(false);
-      setImportFile(null);
-      setImportPreview([]);
+      toast.loading('Đang import nhóm từ Excel...', { id: 'import-group' });
+      const result = await teacherService.importGroupsFromExcel(selectedClassId, importFile);
+      setImportResult(result);
+      toast.success(
+        `Đã tạo ${result.groupCount} nhóm · ${result.memberCount} SV · ${result.leaderCount} nhóm trưởng` +
+          (result.createdUsersCount > 0 ? ` · ${result.createdUsersCount} SV mới` : ''),
+        { id: 'import-group' },
+      );
       loadClassData(selectedClassId);
     } catch (error: any) {
       toast.error(error.response?.data?.message || error.message, { id: 'import-group' });
@@ -203,13 +206,17 @@ export default function GroupManagement() {
     }
   };
 
+  const handleCloseImport = () => {
+    setIsImportModalOpen(false);
+    setImportFile(null);
+    setImportResult(null);
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: false,
     accept: {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'text/csv': ['.csv']
     }
   });
 
@@ -225,25 +232,36 @@ export default function GroupManagement() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-3">
-            Quản lý Nhóm Sinh Viên
+            {isIndividualMode ? 'Phân công Đề tài Cá nhân' : 'Quản lý Nhóm Sinh Viên'}
             <Users className="w-8 h-8 text-indigo-500" />
+            {selectedClass && (
+              <span className={`text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                isIndividualMode
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {ASSIGNMENT_TYPE_LABEL[assignmentType]}
+              </span>
+            )}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold mt-1">
-            Điều phối danh sách thành viên và phân công đề tài cho các nhóm.
+            {isIndividualMode
+              ? 'Lớp loại "Cá nhân" — gán đề tài trực tiếp cho từng sinh viên (1 SV ↔ 1 đề tài).'
+              : 'Điều phối danh sách thành viên và phân công đề tài cho các nhóm.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={() => setIsImportModalOpen(true)}
             className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
-            disabled={!selectedClassId}
+            disabled={!selectedClassId || isIndividualMode}
           >
             <UploadCloud className="w-4 h-4 mr-2" /> Nhập từ Excel
           </Button>
           <Button
             onClick={() => setIsCreateModalOpen(true)}
             className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
-            disabled={!selectedClassId}
+            disabled={!selectedClassId || isIndividualMode}
           >
             <Plus className="w-4 h-4 mr-2" /> Tạo nhóm mới
           </Button>
@@ -285,10 +303,11 @@ export default function GroupManagement() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        {/* DANH SÁCH NHÓM */}
+        {/* DANH SÁCH NHÓM / ĐỀ TÀI */}
         <div className="lg:col-span-8 space-y-4">
           <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-            <Layers className="w-5 h-5 text-indigo-500" /> Danh sách Nhóm
+            <Layers className="w-5 h-5 text-indigo-500" />
+            {isIndividualMode ? 'Đề tài đã gán cho từng SV' : 'Danh sách Nhóm'}
           </h3>
 
           {isLoading ? (
@@ -296,8 +315,14 @@ export default function GroupManagement() {
           ) : groups.length === 0 ? (
             <Card className="p-10 text-center rounded-2xl border-dashed border-2 bg-slate-50">
               <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h4 className="text-slate-700 font-bold">Chưa có nhóm nào được tạo</h4>
-              <p className="text-slate-500 text-sm mt-1">Tạo nhóm mới hoặc sử dụng tính năng chia nhóm tự động.</p>
+              <h4 className="text-slate-700 font-bold">
+                {isIndividualMode ? 'Chưa có đề tài cá nhân nào được gán' : 'Chưa có nhóm nào được tạo'}
+              </h4>
+              <p className="text-slate-500 text-sm mt-1">
+                {isIndividualMode
+                  ? 'Chọn sinh viên ở bảng bên phải và bấm "Gán đề tài".'
+                  : 'Tạo nhóm mới hoặc sử dụng tính năng chia nhóm tự động.'}
+              </p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -374,22 +399,35 @@ export default function GroupManagement() {
                         <p className="text-[10px] text-slate-500 font-medium mt-0.5">{student.studentCode}</p>
                       </div>
 
-                      {/* Menu chọn nhóm để thêm vào */}
-                      <select
-                        className="text-[10px] p-1.5 rounded-lg border border-slate-200 bg-white max-w-[100px] outline-none opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddMember(e.target.value, student.id);
-                            e.target.value = '';
-                          }
-                        }}
-                        defaultValue=""
-                      >
-                        <option value="" disabled>Thêm vào...</option>
-                        {groups.map(g => (
-                          <option key={g.id} value={g.id}>{g.name}</option>
-                        ))}
-                      </select>
+                      {isIndividualMode ? (
+                        <button
+                          onClick={() => {
+                            setIndividualAssignTarget({ id: student.id, fullName: student.fullName, studentCode: student.studentCode });
+                            setIndividualTopicName('');
+                            setIndividualDescription('');
+                          }}
+                          className="text-[10px] px-2 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold border border-amber-200 transition-colors"
+                        >
+                          <FileText className="w-3 h-3 inline mr-1" />
+                          Gán đề tài
+                        </button>
+                      ) : (
+                        <select
+                          className="text-[10px] p-1.5 rounded-lg border border-slate-200 bg-white max-w-[100px] outline-none opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAddMember(e.target.value, student.id);
+                              e.target.value = '';
+                            }
+                          }}
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Thêm vào...</option>
+                          {groups.map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -463,12 +501,14 @@ export default function GroupManagement() {
       </Dialog>
 
       {/* Dialog Import Excel */}
-      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-2xl">
+      <Dialog open={isImportModalOpen} onOpenChange={(open) => { if (!open) handleCloseImport(); else setIsImportModalOpen(true); }}>
+        <DialogContent className="sm:max-w-[640px] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-black">Nhập Nhóm Từ Excel</DialogTitle>
             <DialogDescription className="text-xs font-medium">
-              Vui lòng tải lên file có các cột: MSSV, Tên nhóm, Đề tài
+              File mẫu: sheet <b>Điểm Danh</b>, header ở dòng 7 (MSSV / Họ lót / Tên / Nhóm / Tên nhóm / Đề tài). Sinh viên có
+              <span className="text-rose-600 font-bold"> tên in đỏ </span>
+              sẽ được gán là <b>nhóm trưởng</b>. Sinh viên chưa có trong hệ thống sẽ được tự động tạo tài khoản (mật khẩu mặc định: <code>123456</code>, bắt buộc đổi sau lần đăng nhập đầu).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -480,7 +520,7 @@ export default function GroupManagement() {
                 <input {...getInputProps()} />
                 <UploadCloud className="w-10 h-10 text-slate-400 mb-3" />
                 <p className="text-sm font-bold text-slate-600">Kéo thả file vào đây, hoặc click để chọn file</p>
-                <p className="text-xs text-slate-400 mt-1">Hỗ trợ .xlsx, .xls, .csv</p>
+                <p className="text-xs text-slate-400 mt-1">Chỉ chấp nhận .xlsx</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -489,47 +529,132 @@ export default function GroupManagement() {
                     <Check className="w-5 h-5 text-emerald-600" />
                     <div>
                       <p className="text-sm font-bold text-emerald-800">{importFile.name}</p>
-                      <p className="text-xs text-emerald-600">Tìm thấy {importPreview.length} nhóm hợp lệ</p>
+                      <p className="text-xs text-emerald-600">{(importFile.size / 1024).toFixed(1)} KB</p>
                     </div>
                   </div>
-                  <button onClick={() => { setImportFile(null); setImportPreview([]); }} className="p-1 hover:bg-emerald-100 rounded-full text-emerald-700">
+                  <button
+                    onClick={() => { setImportFile(null); setImportResult(null); }}
+                    className="p-1 hover:bg-emerald-100 rounded-full text-emerald-700"
+                    disabled={isProcessingImport}
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {importPreview.length > 0 && (
-                  <div className="max-h-[300px] overflow-y-auto border border-slate-200 rounded-xl">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50 sticky top-0">
-                        <tr>
-                          <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200">Tên nhóm</th>
-                          <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200">Đề tài</th>
-                          <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200 text-center">Số SV</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {importPreview.map((g, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="px-3 py-2 font-semibold text-slate-700">{g.name}</td>
-                            <td className="px-3 py-2 text-slate-500 truncate max-w-[200px]" title={g.topicName}>{g.topicName || '-'}</td>
-                            <td className="px-3 py-2 text-center text-slate-600 font-bold">{g.studentCodes.length}</td>
+                {importResult && (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-lg bg-indigo-50 text-indigo-800">
+                        <p className="font-bold text-lg">{importResult.groupCount}</p>
+                        <p className="font-semibold">Nhóm</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800">
+                        <p className="font-bold text-lg">{importResult.memberCount}</p>
+                        <p className="font-semibold">Sinh viên</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-amber-50 text-amber-800">
+                        <p className="font-bold text-lg">{importResult.leaderCount}</p>
+                        <p className="font-semibold">Nhóm trưởng</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-rose-50 text-rose-800">
+                        <p className="font-bold text-lg">{importResult.createdUsersCount}</p>
+                        <p className="font-semibold">SV mới tạo</p>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[260px] overflow-y-auto border border-slate-200 rounded-xl">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200">#</th>
+                            <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200">Tên nhóm</th>
+                            <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200">Đề tài</th>
+                            <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200 text-center">SV</th>
+                            <th className="px-3 py-2 font-bold text-slate-600 border-b border-slate-200">Nhóm trưởng</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {importResult.groups.map((g) => (
+                            <tr key={g.id} className="hover:bg-slate-50">
+                              <td className="px-3 py-2 text-slate-500 font-semibold">{g.groupNo}</td>
+                              <td className="px-3 py-2 font-semibold text-slate-700">{g.name}</td>
+                              <td className="px-3 py-2 text-slate-500 truncate max-w-[180px]" title={g.topicName}>{g.topicName || '-'}</td>
+                              <td className="px-3 py-2 text-center text-slate-600 font-bold">{g.memberCount}</td>
+                              <td className="px-3 py-2">
+                                {g.leaderCode ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">
+                                    <Crown className="w-3 h-3" /> {g.leaderCode}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setIsImportModalOpen(false)}>Hủy</Button>
-            <Button
-              className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleConfirmImport}
-              disabled={!importFile || importPreview.length === 0 || isProcessingImport}
-            >
-              Xác nhận Import
+            <Button variant="outline" className="rounded-xl" onClick={handleCloseImport}>
+              {importResult ? 'Đóng' : 'Hủy'}
+            </Button>
+            {!importResult && (
+              <Button
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleConfirmImport}
+                disabled={!importFile || isProcessingImport}
+              >
+                {isProcessingImport ? 'Đang xử lý...' : 'Xác nhận Import'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Gán đề tài cá nhân (CA_NHAN) */}
+      <Dialog open={!!individualAssignTarget} onOpenChange={(open) => { if (!open) setIndividualAssignTarget(null); }}>
+        <DialogContent className="sm:max-w-[425px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">Gán Đề Tài Cá Nhân</DialogTitle>
+            <DialogDescription className="text-xs font-medium">
+              Đề tài sẽ được giao trực tiếp cho sinh viên. Một "nhóm 1 thành viên" sẽ được tạo tự động để dùng chung pipeline nộp bài / chấm điểm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {individualAssignTarget && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs">
+                <p className="font-bold text-amber-900">{individualAssignTarget.fullName}</p>
+                <p className="text-amber-700 font-semibold">{individualAssignTarget.studentCode}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">Tên đề tài <span className="text-rose-500">*</span></label>
+              <Input
+                placeholder="VD: Xây dựng hệ thống ABC..."
+                value={individualTopicName}
+                onChange={(e) => setIndividualTopicName(e.target.value)}
+                className="rounded-xl border-slate-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">Mô tả (Tùy chọn)</label>
+              <Input
+                placeholder="Mục tiêu, phạm vi..."
+                value={individualDescription}
+                onChange={(e) => setIndividualDescription(e.target.value)}
+                className="rounded-xl border-slate-200"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setIndividualAssignTarget(null)}>Hủy</Button>
+            <Button className="rounded-xl bg-amber-600 hover:bg-amber-700" onClick={handleSubmitIndividualAssignment}>
+              Xác nhận gán đề tài
             </Button>
           </DialogFooter>
         </DialogContent>
