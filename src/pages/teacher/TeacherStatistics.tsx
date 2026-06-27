@@ -172,7 +172,7 @@ export default function TeacherStatistics() {
     csvContent += `Tên nhóm,Tên đề tài,Trạng thái,Điểm cuối\n`;
     const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     groups.forEach((g: any) => {
-      const sub = submissions.find((s: any) => s.groupId === g.id);
+      const sub: any = submissions.find((s: any) => s.groupId === g.id);
       const score = sub?.grades?.[0]?.finalScore ?? '';
       csvContent += `${escape(g.name)},${escape(g.topicName || 'Chưa có')},${escape(sub?.status || 'CHUA_NOP')},${escape(score)}\n`;
     });
