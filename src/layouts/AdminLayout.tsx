@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Users,
-  UploadCloud,
   FileText,
   Database,
   Sliders,
@@ -84,11 +83,6 @@ export default function AdminLayout() {
       title: 'Quản lý tài khoản',
       path: '/admin/accounts',
       icon: Users
-    },
-    {
-      title: 'Nhập liệu hàng loạt',
-      path: '/admin/importer',
-      icon: UploadCloud
     },
     {
       title: 'Giám sát & Vi phạm',

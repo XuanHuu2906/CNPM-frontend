@@ -1,7 +1,7 @@
 # BÁO CÁO KIỂM TRA DỰ ÁN
 ## Phần mềm Chấm Điểm Báo Cáo Đề Tài Môn Học (CNPM)
 
-> **Cập nhật 2026-06-22**: Báo cáo ban đầu lập khi DB Supabase đã paused và đa số bug chưa được sửa. Sau các Phase 2 / 3 / A / B / C, gần như toàn bộ bug critical & high đã được fix. Xem mục **5. LỊCH SỬ FIX** cuối file để đối chiếu commit.
+> **Cập nhật 2026-06-22**: Báo cáo ban đầu lập khi DB Supabase đã paused và đa số bug chưa được sửa. Sau các Phase 2 / 3 / A / B / C, gần như toàn bộ bug critical & high đã được fix. **Phase 4** (B16 rate-limit + UC-I04 tier-2/3 audit) đã hoàn tất trong session 2026-06-22. Xem mục **5. LỊCH SỬ FIX** cuối file để đối chiếu commit.
 
 ---
 
@@ -56,15 +56,15 @@ FE phân vùng đúng theo 4 role: `student/`, `teacher/`, `academic/`, `admin/`
 | UC-06 | Xem điểm/phản hồi | SV | `/grades/submission/:id` | `grade.service` | `student/StudentEvaluation.tsx` | ✅ **FIXED** (B1): controller chặn SV xem draft + middleware ownership scope |
 | UC-07 | Quản lý lớp học phần | GV | `/teacher/class-sections` | `teacher.service` | `teacher/TeacherDashboard.tsx` | ✅ Có |
 | UC-08 | Thiết lập rubric | GV | `/rubrics` | `rubric.service` | `teacher/RubricDesigner.tsx` | ✅ **FIXED** (B6): chỉ TEACHER tạo/xoá rubric |
-| UC-09 | Chấm điểm | GV | `/grades/submission/:id` | `grade.service` | `teacher/GradingWorkshop.tsx` | ✅ **FIXED** (B5 + TS): `verifyTeacherClassOwnership` + TS lỗi conflict OCC fix xong |
+| UC-09 | Chấm điểm | GV | `/grades/submission/:id` + `/grades/submission/:id/member-adjustments` | `grade.service` | `teacher/GradingWorkshop.tsx` | ✅ **EXT (R11)**: thêm panel "Phân chia đóng góp nhóm" — GV nhập hệ số 0–1.5 cho từng thành viên, preview điểm cá nhân = điểm nhóm × hệ số (clamp 0–10), khóa khi bài chuyển CHO_DUYET. Audit `DIEU_CHINH_DIEM_THANH_VIEN_NHOM`. |
 | UC-10 | Gửi yêu cầu sửa | GV | `/submissions/:id/status` + `/edit-requests` | `submission.service` | `teacher/GradingWorkshop.tsx` | ✅ Có (thêm audit CAP_NHAT_TRANG_THAI_BAI) |
 | UC-11 | Xuất báo cáo lớp | GV | (client-side CSV) | — | `teacher/TeacherStatistics.tsx` | ✅ **FIXED**: CSV thêm section "Chi tiết bài nộp theo nhóm" có `topicName` (TS-BE-1 cũng đã fix select `topicName: true`) |
 | UC-12 | Nhập dữ liệu nền | Admin/PĐT | `/academic/*/batch` + `/users/batch` | `academic.service` | `admin/BatchImporter.tsx` | ✅ Có (thêm S4 batch limit 500 records) |
 | UC-13 | Cấp quyền tài khoản | Admin | `/users/:id/role-status`, `/users/:id/reset-password`, `/auth/change-password` | `user.service`, `auth.service` | `admin/AccountManagement.tsx`, `auth/ChangePassword.tsx` (mới) | ✅ **FIXED**: TS lỗi fix; thêm `User.mustChangePassword` + force-change flow (BE flag + FE guard `PrivateRoute` redirect `/change-password`); seed flag mustChangePassword=true cho tất cả tài khoản mặc định |
 | UC-14 | Cấu hình hệ thống | Admin | `/system/configs` | `system.service` | `admin/SystemSettings.tsx` | ✅ **FIXED** (B12): chỉ ADMIN |
 | UC-15 | Xử lý vi phạm | GV/PĐT/Admin | `/submissions/:id/status` (TU_CHOI) | `submission.service` | `teacher/GradingWorkshop.tsx` | ✅ **FIXED** (B13): cột `violationType` riêng (Prisma migration ready); FE thêm dropdown chọn loại vi phạm (DAO_VAN / NOP_RAC / TRE_HAN / KHONG_DUNG_DE_TAI / CHO_KIEM_TRA / KHAC) |
-| UC-16 | Phê duyệt kết quả | PĐT | `/system/grades/:id/approve` | `system.service` | `academic/AcademicApprovals.tsx` | ✅ Có |
-| UC-17 | Điều chỉnh GV phụ trách | PĐT | `/academic/assignments` | `academic.service` | `academic/AcademicAssignment.tsx` | ✅ Có |
+| UC-16 | Phê duyệt kết quả | PĐT | `/system/grades/:id/approve` + `/system/grades/batch-approve` + `/teacher/class-sections/:id/submit-for-review` | `system.service` + `teacher.service` | `academic/AcademicApprovals.tsx` + `teacher/TeacherDashboard.tsx` | ✅ **EXT**: GV có nút "Gửi duyệt cả lớp" (chuyển DA_CHAM → CHO_DUYET hàng loạt + 1 notification gộp PĐT). PĐT có multi-select checkbox + "Phê duyệt N bài" / "Trả về N bài" với lý do chung; BE batch endpoint flip cả Grade.isApproved và submission.status (HOAN_THANH / DANG_CHAM) trong transaction per-item, kết quả per-item. Audit `GV_GUI_DUYET_CA_LOP` + `PHE_DUYET_DIEM_LO`. |
+| UC-17 | Điều chỉnh GV phụ trách | PĐT | `/academic/classes/:classId/teacher` + `/academic/classes/:classId/assignment-history` | `academic.service.changeClassTeacher` + `getClassAssignmentHistory` | `academic/AcademicAssignment.tsx` + badge trong `teacher/GradingWorkshop.tsx` | ✅ **EXT (R12)**: 1 endpoint thay vì unassign+assign; lý do bắt buộc ≥5 ký tự; ghi `AssignmentHistory` (snapshot oldTeacherId/newTeacherId/assignmentId cũ); thông báo cả 2 GV kèm số bài đang chấm dở. Điểm nháp + DA_CHAM của GV cũ giữ nguyên — GV mới sửa được qua Assignment-based ownership. Modal hiển thị danh sách lịch sử thay đổi GV. Audit `THAY_DOI_GV_PHU_TRACH`. |
 | UC-18 | Giám sát tiến độ | PĐT/Admin | `/system/semesters/:id/progress` | `system.service` | `academic/AcademicDashboard.tsx`, `admin/ProgressMonitoring.tsx` | ✅ Có |
 | UC-19 | Khóa kết quả cuối kỳ | Admin | `/system/semesters/:id/lock` | `system.service.lockSemester` | `academic/AcademicTerms.tsx` | ✅ **FIXED**: precondition (tất cả báo cáo phải HOAN_THANH) đã có trong `lockSemester`; chặn bypass qua `updateTerm` bằng cách bỏ `isLocked` khỏi `updateTermSchema` |
 | UC-20 | Sao lưu / phục hồi | Admin | `/system/backup`, `/system/restore`, `/system/backups/*` | `system.service` | `admin/DataBackupRestore.tsx` | ✅ **FIXED** (B11): chỉ ADMIN |
@@ -108,12 +108,14 @@ FE phân vùng đúng theo 4 role: `student/`, `teacher/`, `academic/`, `admin/`
 | R4 | GV **KHÔNG tự sửa điểm** sau DA_CHAM — phải xin mở lại | ⚠️ GẦN ĐÚNG | ✅ **ĐÚNG** | `grade.service.submitGrade` chặn khi `submission.status ∈ {DA_CHAM, CHO_DUYET, HOAN_THANH}` (B7 fix) |
 | R5 | SV **chỉ thấy điểm sau khi PĐT duyệt** (HOAN_THANH) | ❌ VI PHẠM | ✅ **ĐÚNG** | `grade.controller.getGradeBySubmissionId` chặn STUDENT khi status ≠ HOAN_THANH (B1 fix) |
 | R6 | Điểm nháp chỉ GV thấy | ❌ VI PHẠM | ✅ **ĐÚNG** | Cùng B1 fix + middleware `verifySubmissionOwnershipBy('submissionId')` scope STUDENT/TEACHER |
-| R7 | Không có chat/bình luận tự do GV-SV | ⚠️ VƯỢT PHẠM VI | ⚠️ **VẪN VƯỢT** | Module `/comments` vẫn còn full CRUD (B20). Quyết định bỏ hay rename "Ghi chú nội bộ" để Phase 4 |
+| R7 | Không có chat/bình luận tự do GV-SV | ⚠️ VƯỢT PHẠM VI | ✅ **ĐÚNG** | B20 fix: rename `/comments` → `/internal-notes`, restrict TEACHER/ADMIN/AD, SV không truy cập. UI "Ghi chú nội bộ" trong GradingWorkshop |
 | R8 | Thông báo theo đúng vai trò (PĐT không nhận event nhỏ) | ✅ Đúng | ✅ **ĐÚNG** | Không đổi |
 | R9 | Khóa kỳ chỉ sau khi PĐT duyệt toàn bộ | ⚠️ CHƯA RÕ | ✅ **ĐÚNG** | `system.service.lockSemester:461-468` kiểm tra `approvedReports >= totalReports`; `updateTermSchema` bỏ `isLocked` để chặn bypass (UC-19 fix) |
 | R10 | Rubric không sửa sau khi có điểm (trừ mở lại hợp lệ) | ⚠️ CHƯA ĐỦ | ⚠️ **CHƯA ĐỦ** | `rubric.service.deleteRubric` đã check `_count.grades > 0`; vẫn chưa có method `updateRubric` — nếu thêm sau này phải nhớ check |
+| R11 | Bài nhóm: điểm gán cho nhóm; GV được điều chỉnh hệ số đóng góp [0, 1.5] trước khi gửi duyệt; khóa sau CHO_DUYET | (mới) | ✅ **ĐÚNG** | `grade.service.setMemberAdjustments` validate factor [0, 1.5], membership trong nhóm, lock khi status ∈ {CHO_DUYET, HOAN_THANH}; model `GradeMemberAdjustment` unique `(gradeId, studentId)`. UC-I05 cập nhật công thức `điểm cá nhân = điểm nhóm × hệ số` (clamp 0–10). |
+| R12 | Đổi GV phụ trách giữa kỳ: nháp/điểm GV cũ giữ nguyên; GV mới sửa được qua quyền sở hữu lớp; điểm CHO_DUYET/HOAN_THANH khóa | (mới) | ✅ **ĐÚNG** | `academic.service.changeClassTeacher` chạy trong transaction: ghi `AssignmentHistory` → xoá Assignment cũ → tạo mới. `verifyTeacherClassOwnership` đã là Assignment-based, không gate theo `Grade.teacherId` → GV mới sửa được nháp GV cũ. Comment cảnh báo trong `grade.service.submitGrade` để chặn regression. FE badge "Chấm nháp bởi GV cũ" trong GradingWorkshop. |
 
-**Tổng kết R**: **8/10 đúng** · 2/10 còn ⚠️ (R7 module comment, R10 chưa tồn tại updateRubric).
+**Tổng kết R**: **11/12 đúng** · 1/12 còn ⚠️ (R10 chưa tồn tại updateRubric).
 
 ---
 
@@ -132,6 +134,7 @@ FE phân vùng đúng theo 4 role: `student/`, `teacher/`, `academic/`, `admin/`
 | `ea76885` | fix(submission): store violation type in dedicated column | B13 |
 | `e9bbc69` | fix(upload): whitelist file extension alongside mime | UC-I02 |
 | `5fff462` | feat(audit): cover tier-1 mutations in SystemLog | UC-I04 (partial) |
+| _(pending commit)_ | feat(security): rate-limit upload/submit + audit log tier-2/3 + B20 internal-notes BE | B16, UC-I04 tier-2/3, B20 BE |
 
 ### Frontend (`D:\CNPM\CNPM-frontend-push`, branch `Huu`)
 
@@ -140,6 +143,7 @@ FE phân vùng đúng theo 4 role: `student/`, `teacher/`, `academic/`, `admin/`
 | `b9f2231` | fix(frontend): resolve TypeScript build errors + wire B9 classId | 11 TS lỗi + B9 |
 | `3b729b2` | feat(auth): force first-login password change wire-up | UC-13 FE (Login redirect + PrivateRoute guard + `/change-password` page) |
 | `8f2caa3` | feat(frontend): polish UC-04 / UC-11 / UC-15 wire-up | UC-04 UX, UC-11 CSV detail + topicName, UC-15 violationType dropdown |
+| _(pending commit)_ | feat(frontend): internal-notes panel in GradingWorkshop + remove SV comment helper | B20 FE |
 
 ---
 
@@ -152,10 +156,10 @@ FE phân vùng đúng theo 4 role: `student/`, `teacher/`, `academic/`, `admin/`
   3. **Rotate** toàn bộ secret thật
 - **B15**: `NODE_ENV=development` trong `.env` → stack trace có thể lộ. Document rõ "phải đổi sang `production` khi deploy" (đã thêm warning runtime trong `app.ts`).
 
-### Phase 4 — Hardening (chưa làm)
-- **B16**: thêm `express-rate-limit` cho `/submissions/upload` (mime + extension đã chặn, còn thiếu rate-limit)
-- **B20**: quyết định module `/comments` — bỏ hoàn toàn hay đổi tên thành "Ghi chú nội bộ giảng viên" (R7)
-- **UC-I04 tier-2/3**: thêm audit log cho 20+ endpoint còn lại (resubmission/reopen, group/topic, batch import, rubric)
+### Phase 4 — Hardening (HOÀN TẤT)
+- ✅ **B16**: `express-rate-limit` cho `/submissions/upload` (10 req / 5 phút / user) và `/submissions/submit` (20 req / 5 phút / user) — key theo `user.id` (fallback IP)
+- ✅ **B20**: rename `/comments` → `/internal-notes`. Restrict TEACHER/ADMIN/AD only (SV không truy cập). Thêm UI "Ghi chú nội bộ giảng viên" trong `GradingWorkshop.tsx` (collapsible panel với list/add/delete). Tuân thủ R7.
+- ✅ **UC-I04 tier-2/3**: đã thêm audit log cho resubmission-request (create/approve/reject), reopen-request (create/approve/reject), group/topic (8 action), batch imports (users/terms/classes/enrollments), rubric (create/delete), assignment (assign/unassign), term/subject/class create-update, ghi chú nội bộ (create/delete)
 
 ### Phase 5 — Tech debt (low priority)
 - **B18**: migrate Role/Status từ String sang Prisma enum (cần migration cẩn thận với dữ liệu hiện tại)
@@ -167,6 +171,10 @@ FE phân vùng đúng theo 4 role: `student/`, `teacher/`, `academic/`, `admin/`
 ### ⚠️ Bước thủ công bắt buộc khi DB Supabase sống lại
 ```bash
 cd D:\CNPM\CNPM-backend-push
-npx prisma db push   # apply 2 cột mới: User.BatBuocDoiMatKhau, BaoCao.LoaiViPham
+npx prisma db push   # apply các thay đổi schema:
+                     #  - User.BatBuocDoiMatKhau (UC-13 / S5)
+                     #  - BaoCao.LoaiViPham (B13)
+                     #  - LichSuPhanCong (AssignmentHistory) wire FKs + cột LopHocID (R12 / UC-17)
+                     #  - DieuChinhDiemThanhVien (GradeMemberAdjustment) — model mới (R11 / UC-09 / UC-I05)
 npx prisma db seed   # tuỳ chọn: re-seed để gắn mustChangePassword=true cho dev data
 ```

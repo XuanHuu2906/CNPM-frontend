@@ -72,6 +72,29 @@ export default function AcademicApprovals() {
   const [rejectReason, setRejectReason] = useState('');
   const [targetRejectReportId, setTargetRejectReportId] = useState<string | null>(null);
 
+  // UC-16 (BATCH): tích chọn nhiều bài để duyệt / trả về theo lô.
+  const [selectedReportIds, setSelectedReportIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<'APPROVE' | 'RETURN' | null>(null);
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkLastResults, setBulkLastResults] = useState<Array<
+    | { submissionId: string; status: 'SUCCESS' }
+    | { submissionId: string; status: 'FAILED'; reason: string }
+  > | null>(null);
+
+  const toggleReportSelection = (reportId: string) => {
+    setSelectedReportIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(reportId)) next.delete(reportId);
+      else next.add(reportId);
+      return next;
+    });
+  };
+  const clearSelection = () => {
+    setSelectedReportIds(new Set());
+    setBulkLastResults(null);
+  };
+
   // Tải dữ liệu từ Backend
   const loadData = async () => {
     try {
@@ -259,38 +282,62 @@ export default function AcademicApprovals() {
     }
   };
 
-  // Phê duyệt nhanh toàn bộ đề tài hợp lệ trong lớp (Batch Approve All)
+  // UC-16 (BATCH): phê duyệt nhanh toàn bộ đề tài CHO_DUYET trong lớp — qua endpoint mới
+  // (BE flip cả Grade.isApproved và submission.status sang HOAN_THANH trong 1 giao dịch/bài).
   const handleBatchApproveAll = async () => {
     if (!currentClass || !isBatchApproveEnabled) return;
 
-    const unassignedOrUnscored = currentClass.reports.filter(r => r.score === null);
-    if (unassignedOrUnscored.length > 0) {
-      toast.error(
-        <div className="text-left font-semibold">
-          <p className="text-red-600 dark:text-red-400 font-extrabold flex items-center gap-1">🚨 Chặn Phê duyệt Hàng loạt!</p>
-          <p className="text-xs text-slate-500 mt-1">Lớp có {unassignedOrUnscored.length} đề tài chưa chấm xong điểm số. Hãy yêu cầu chấm xong trước.</p>
-        </div>
-      );
+    const toApprove = currentClass.reports.filter(r => r.status === 'CHO_DUYET' && r.score !== null);
+    if (toApprove.length === 0) {
+      toast.info('Không có đề tài nào cần phê duyệt bổ sung.', { id: 'batch-approve' });
       return;
     }
 
     try {
-      toast.loading('Đang phê duyệt nhanh toàn bộ lớp học phần...', { id: 'batch-approve' });
-      
-      const toApprove = currentClass.reports.filter(r => r.status === 'CHO_DUYET');
-      if (toApprove.length === 0) {
-        toast.info('Không có đề tài nào cần phê duyệt bổ sung.', { id: 'batch-approve' });
-        return;
+      toast.loading(`Đang phê duyệt ${toApprove.length} bài...`, { id: 'batch-approve' });
+      const res = await academicService.batchApproveGrades({
+        submissionIds: toApprove.map(r => r.id),
+        action: 'APPROVE',
+      });
+      toast.success(`Đã phê duyệt ${res.successCount}/${res.totalRequested} bài lớp ${currentClass.code}.`, { id: 'batch-approve' });
+      if (res.failedCount > 0) {
+        setBulkLastResults(res.results);
       }
-
-      await Promise.all(
-        toApprove.map(r => academicService.approveGrade(r.id, { isApproved: true, version: r.version }))
-      );
-
-      toast.success(`Đã phê duyệt nhanh ${toApprove.length} kết quả lớp học phần ${currentClass.code} thành công!`, { id: 'batch-approve' });
       loadData();
     } catch (error: any) {
-      toast.error(`Duyệt hàng loạt thất bại: ${error.message}`, { id: 'batch-approve' });
+      const msg = error?.response?.data?.message || error.message;
+      toast.error(`Duyệt hàng loạt thất bại: ${msg}`, { id: 'batch-approve' });
+    }
+  };
+
+  // UC-16 (BATCH): xác nhận hành động theo lựa chọn checkbox.
+  const handleConfirmBulk = async () => {
+    if (!bulkAction || selectedReportIds.size === 0) return;
+    if (bulkAction === 'RETURN' && bulkReason.trim().length < 5) {
+      toast.error('Lý do trả về phải có ít nhất 5 ký tự');
+      return;
+    }
+    try {
+      setBulkSubmitting(true);
+      const res = await academicService.batchApproveGrades({
+        submissionIds: [...selectedReportIds],
+        action: bulkAction,
+        reason: bulkAction === 'RETURN' ? bulkReason.trim() : undefined,
+      });
+      const verb = bulkAction === 'APPROVE' ? 'phê duyệt' : 'trả về chấm lại';
+      toast.success(`Đã ${verb} ${res.successCount}/${res.totalRequested} bài.`);
+      setBulkLastResults(res.results);
+      setBulkAction(null);
+      setBulkReason('');
+      if (res.failedCount === 0) {
+        clearSelection();
+      }
+      loadData();
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error.message;
+      toast.error(`Xử lý theo lô thất bại: ${msg}`);
+    } finally {
+      setBulkSubmitting(false);
     }
   };
 
@@ -410,23 +457,63 @@ export default function AcademicApprovals() {
                       {currentClass.name}
                     </h2>
                   </div>
-                  {isBatchApproveEnabled ? (
-                    <button
-                      onClick={handleBatchApproveAll}
-                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer shrink-0"
-                    >
-                      Duyệt nhanh tất cả
-                    </button>
-                  ) : (
-                    <button
-                      disabled
-                      title="Chỉ khả dụng khi tất cả đề tài đã có điểm, nhận xét, rubric và ở trạng thái Chờ phê duyệt."
-                      className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all cursor-not-allowed shrink-0"
-                    >
-                      Duyệt nhanh tất cả
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {selectedReportIds.size > 0 && (
+                      <>
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                          Đã chọn {selectedReportIds.size} bài
+                        </span>
+                        <button
+                          onClick={() => setBulkAction('APPROVE')}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
+                        >
+                          Phê duyệt {selectedReportIds.size}
+                        </button>
+                        <button
+                          onClick={() => setBulkAction('RETURN')}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
+                        >
+                          Trả về {selectedReportIds.size}
+                        </button>
+                        <button
+                          onClick={clearSelection}
+                          className="px-2.5 py-1.5 text-xs font-bold border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                        >
+                          Bỏ chọn
+                        </button>
+                      </>
+                    )}
+                    {isBatchApproveEnabled ? (
+                      <button
+                        onClick={handleBatchApproveAll}
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
+                      >
+                        Duyệt nhanh tất cả
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        title="Chỉ khả dụng khi tất cả đề tài đã có điểm, nhận xét, rubric và ở trạng thái Chờ phê duyệt."
+                        className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all cursor-not-allowed"
+                      >
+                        Duyệt nhanh tất cả
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* UC-16 (BATCH): Per-item failure report banner */}
+                {bulkLastResults && bulkLastResults.some(r => r.status === 'FAILED') && (
+                  <div className="mx-4 mt-3 p-3 rounded-xl border border-rose-100 bg-rose-50/70 dark:bg-rose-950/20 dark:border-rose-900 text-[11px] font-semibold text-rose-700 dark:text-rose-300 space-y-1.5">
+                    <div className="font-extrabold uppercase tracking-wide">Một số bài chưa xử lý được</div>
+                    {bulkLastResults.filter(r => r.status === 'FAILED').slice(0, 5).map(r => (
+                      <div key={r.submissionId} className="font-medium">
+                        • <code className="text-rose-800 dark:text-rose-200">{r.submissionId}</code>: {(r as any).reason}
+                      </div>
+                    ))}
+                    <button onClick={() => setBulkLastResults(null)} className="underline text-rose-500 text-[10px] cursor-pointer">Đóng</button>
+                  </div>
+                )}
 
                 <div className="p-4 space-y-3">
                   {paginatedReports.map((report) => {
@@ -451,6 +538,17 @@ export default function AcademicApprovals() {
                         )}
 
                         <div className="flex items-start justify-between gap-4">
+                          {/* UC-16 (BATCH): checkbox để chọn nhiều bài CHO_DUYET. */}
+                          {report.status === 'CHO_DUYET' && report.score !== null && (
+                            <input
+                              type="checkbox"
+                              checked={selectedReportIds.has(report.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => toggleReportSelection(report.id)}
+                              className="mt-1 h-4 w-4 cursor-pointer accent-indigo-600 shrink-0"
+                              title="Chọn để duyệt / trả về theo lô"
+                            />
+                          )}
                           <div className="space-y-1 min-w-0 flex-1">
                             <span className="block text-[10px] font-extrabold text-slate-400 dark:text-slate-500 truncate">
                               {report.groupName} • {report.members.join(', ')}
@@ -702,6 +800,53 @@ export default function AcademicApprovals() {
               >
                 <Send className="w-3.5 h-3.5" />
                 Gửi yêu cầu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UC-16 (BATCH): xác nhận hành động theo lô */}
+      {bulkAction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 text-left text-slate-800 dark:text-slate-100">
+            <h3 className={`text-lg font-black flex items-center gap-2 ${bulkAction === 'APPROVE' ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {bulkAction === 'APPROVE' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+              {bulkAction === 'APPROVE' ? 'Phê duyệt theo lô' : 'Trả về chấm lại theo lô'}
+            </h3>
+            <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+              {bulkAction === 'APPROVE'
+                ? `Phê duyệt chính thức ${selectedReportIds.size} bài đã chọn. Bài sẽ chuyển sang trạng thái Hoàn thành và sinh viên xem được điểm.`
+                : `Trả về ${selectedReportIds.size} bài cho giảng viên chấm lại. Bài chuyển về trạng thái Đang chấm kèm lý do chung dưới đây.`}
+            </p>
+
+            {bulkAction === 'RETURN' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lý do trả về (áp dụng cho cả lô)</label>
+                <textarea
+                  rows={3}
+                  value={bulkReason}
+                  onChange={(e) => setBulkReason(e.target.value)}
+                  placeholder="Tối thiểu 5 ký tự, ví dụ: 'Phổ điểm lệch so với rubric chung của lớp, đề nghị GV kiểm tra lại.'"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-semibold"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setBulkAction(null); setBulkReason(''); }}
+                disabled={bulkSubmitting}
+                className="px-4 py-2 text-xs font-bold border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmBulk}
+                disabled={bulkSubmitting}
+                className={`px-4 py-2 text-xs font-bold text-white rounded-lg cursor-pointer disabled:opacity-50 ${bulkAction === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+              >
+                {bulkSubmitting ? 'Đang xử lý…' : (bulkAction === 'APPROVE' ? `Phê duyệt ${selectedReportIds.size} bài` : `Trả về ${selectedReportIds.size} bài`)}
               </button>
             </div>
           </div>

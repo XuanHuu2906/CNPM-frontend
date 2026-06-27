@@ -50,10 +50,8 @@ export const studentService = {
     return response.data.data;
   },
 
-  addComment: async (submissionId: string, content: string) => {
-    const response = await apiClient.post(`/comments/submission/${submissionId}`, { content });
-    return response.data.data;
-  },
+  // B20: addComment đã bị xoá khỏi student service. Ghi chú nội bộ chỉ dành cho GV/Admin/PĐT,
+  // SV không được tạo hay xem.
 
   exportPdf: async (submissionId: string) => {
     const response = await apiClient.get(`/submissions/${submissionId}/export-pdf`, {
