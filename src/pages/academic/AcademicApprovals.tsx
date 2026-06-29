@@ -461,8 +461,9 @@ export default function AcademicApprovals() {
           <div className="flex-1 flex flex-col lg:flex-row gap-5 min-h-0">
             
             {/* Core reports list inside the selected class */}
-            <div className="flex-1 min-w-0 border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl flex flex-col overflow-hidden justify-between">
-              <div>
+            <div className="flex-1 min-w-0 border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl flex flex-col overflow-hidden">
+              {/* Header sticky trên + footer pagination dưới, ở giữa là vùng scroll riêng. */}
+              <>
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="text-left min-w-0 flex-1">
                     <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block truncate">{currentClass.code} • {currentClass.department}</span>
@@ -528,7 +529,9 @@ export default function AcademicApprovals() {
                   </div>
                 )}
 
-                <div className="p-4 space-y-3">
+                {/* Scroll riêng cho danh sách: khi zoom hoặc nhiều bài, list sẽ scroll
+                    thay vì đẩy pagination ra khỏi viewport. */}
+                <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-3">
                   {paginatedReports.map((report) => {
                     const isSelected = currentReport?.id === report.id;
                     const isInvalid = report.score === null;
@@ -640,7 +643,7 @@ export default function AcademicApprovals() {
                     );
                   })}
                 </div>
-              </div>
+              </>
 
               <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/10 flex items-center justify-between gap-2 shrink-0">
                 <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
