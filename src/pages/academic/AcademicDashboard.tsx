@@ -83,17 +83,22 @@ export default function AcademicDashboard() {
 
         setSemesters(termsData);
 
-        // Map submissions sang schema ProgressStudent hiển thị
+        // Map submissions sang schema ProgressStudent hiển thị.
+        // BE không trả sub.class trực tiếp → lấy class qua group (bài nhóm) hoặc qua
+        // student.enrollments[0] (bài cá nhân). Schema Assignment không có cột role
+        // → bỏ filter CHAM_CHINH, chỉ lấy GV đầu tiên được phân công.
         const mappedProgress: ProgressStudent[] = subsData.map((sub: any) => {
-          const mainLecturer = sub.class?.assignments?.find((a: any) => a.role === 'CHAM_CHINH')?.teacher?.user?.fullName || 'Chưa phân công';
+          const clazz = sub.group?.class || sub.student?.enrollments?.[0]?.class || null;
+          const mainLecturer =
+            clazz?.assignments?.[0]?.teacher?.user?.fullName || 'Chưa phân công';
           return {
             id: sub.id,
             groupName: sub.group?.name || 'Báo cáo cá nhân',
             student: sub.student?.user?.fullName || 'Sinh viên',
             mssv: sub.student?.studentCode || 'N/A',
-            code: sub.class?.classCode || 'N/A',
-            subject: sub.class?.subject?.name || 'N/A',
-            dept: sub.class?.subject?.subjectCode?.substring(0, 2) || 'CNPM', // Rút trích mã bộ môn
+            code: clazz?.classCode || 'N/A',
+            subject: clazz?.subject?.name || 'N/A',
+            dept: clazz?.subject?.subjectCode?.substring(0, 2) || 'CNPM',
             lecturer: mainLecturer,
             date: sub.createdAt ? new Date(sub.createdAt).toLocaleDateString('vi-VN') : '-',
             version: sub.version ? `v${sub.version}` : 'v1',

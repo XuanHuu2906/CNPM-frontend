@@ -34,6 +34,9 @@ interface TopicReport {
   rubricBreakdown: { name: string; weight: number; score: number | null; comment: string }[];
   version: number;
   fileUrl: string;
+  attachments: string[];
+  repoLink: string | null;
+  videoLink: string | null;
 }
 
 interface ClassApproval {
@@ -162,7 +165,12 @@ export default function AcademicApprovals() {
             version: grade?.version || 1,
             // BE schema trả về filePath (map "DuongDanFile"); fileUrl không tồn tại
             // → trước đây luôn rỗng → link "Mở tệp báo cáo" trở thành href="#" → scroll lên top trang.
-            fileUrl: sub.filePath || sub.fileUrl || ''
+            fileUrl: sub.filePath || sub.fileUrl || '',
+            attachments: Array.isArray(sub.attachments)
+              ? sub.attachments.filter(Boolean)
+              : (typeof sub.attachments === 'string' && sub.attachments ? sub.attachments.split(',').filter(Boolean) : []),
+            repoLink: sub.repoLink || null,
+            videoLink: sub.videoLink || null,
           };
         }).filter((r: TopicReport) => r.status !== 'DANG_CHAM');
 
@@ -748,6 +756,46 @@ export default function AcademicApprovals() {
                         <ExternalLink className="w-4 h-4" />
                         Chưa có tệp báo cáo
                       </button>
+                    )}
+
+                    {currentReport.attachments.length > 0 && (
+                      <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 space-y-1">
+                        <span className="uppercase tracking-wider">Đính kèm ({currentReport.attachments.length})</span>
+                        {currentReport.attachments.map((att, idx) => (
+                          <a
+                            key={idx}
+                            href={att}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block truncate text-indigo-600 dark:text-indigo-400 hover:underline"
+                          >
+                            • {att.split('/').pop()}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {currentReport.repoLink && (
+                      <a
+                        href={currentReport.repoLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline truncate"
+                        title={currentReport.repoLink}
+                      >
+                        Source code: {currentReport.repoLink}
+                      </a>
+                    )}
+                    {currentReport.videoLink && (
+                      <a
+                        href={currentReport.videoLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline truncate"
+                        title={currentReport.videoLink}
+                      >
+                        Video demo: {currentReport.videoLink}
+                      </a>
                     )}
                   </div>
                 </>

@@ -60,6 +60,10 @@ export default function StudentSubmit() {
   const [requestReason, setRequestReason] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
 
+  // Liên kết ngoài: source code (GitHub/GitLab) & video demo (YouTube/Drive).
+  const [repoLink, setRepoLink] = useState('');
+  const [videoLink, setVideoLink] = useState('');
+
   const uploadFileToServer = async (file: File) => {
     try {
       const formData = new FormData();
@@ -104,6 +108,8 @@ export default function StudentSubmit() {
 
       const subData: SubmissionDetail = await studentService.getMySubmission(profile?.student?.classId);
       setSubmission(subData);
+      setRepoLink(subData?.repoLink || '');
+      setVideoLink(subData?.videoLink || '');
 
       if (subData) {
         const files: UploadedFile[] = [];
@@ -216,11 +222,25 @@ export default function StudentSubmit() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
+      // Tài liệu báo cáo
       'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      // Slide thuyết trình
+      'application/vnd.ms-powerpoint': ['.ppt'],
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+      // Source code
       'application/zip': ['.zip'],
       'application/x-zip-compressed': ['.zip'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
-    }
+      'application/vnd.rar': ['.rar'],
+      'application/x-rar-compressed': ['.rar'],
+      // Database dump
+      'application/sql': ['.sql'],
+      'application/octet-stream': ['.rar', '.sql', '.db'],
+      // Video demo
+      'video/mp4': ['.mp4'],
+    },
+    maxSize: 100 * 1024 * 1024,
   });
 
   const handleDeleteUploaded = (id: string) => {
@@ -268,7 +288,9 @@ export default function StudentSubmit() {
       await studentService.submitReport({
         filePath: mainFilePath,
         attachments: otherAttachments,
-        classId: profile?.student?.classId
+        classId: profile?.student?.classId,
+        repoLink: repoLink.trim() || undefined,
+        videoLink: videoLink.trim() || undefined,
       });
 
       toast.success('Nộp báo cáo thành công! Bài nộp đã được chuyển tới Giảng viên hướng dẫn.');
@@ -594,6 +616,37 @@ export default function StudentSubmit() {
                   })
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Liên kết ngoài: source code & video demo */}
+          <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800 mt-6">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Liên kết ngoài (tùy chọn)
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Link source code (GitHub/GitLab)</span>
+                <input
+                  type="url"
+                  value={repoLink}
+                  onChange={(e) => setRepoLink(e.target.value)}
+                  disabled={isActionDisabled}
+                  placeholder="https://github.com/user/repo"
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/25 disabled:opacity-60"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Link video demo (YouTube/Drive)</span>
+                <input
+                  type="url"
+                  value={videoLink}
+                  onChange={(e) => setVideoLink(e.target.value)}
+                  disabled={isActionDisabled}
+                  placeholder="https://youtube.com/watch?v=..."
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/25 disabled:opacity-60"
+                />
+              </label>
             </div>
           </div>
 

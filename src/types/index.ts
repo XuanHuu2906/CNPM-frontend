@@ -384,6 +384,8 @@ export interface SubmissionDetail {
   grades?: Grade[];
   editRequestNote?: string;
   rejectReason?: string;
+  repoLink?: string | null;
+  videoLink?: string | null;
 }
 
 export interface NotificationItem {
