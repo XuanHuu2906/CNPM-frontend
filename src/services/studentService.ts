@@ -45,7 +45,13 @@ export const studentService = {
     return response.data.data;
   },
 
-  submitReport: async (data: { filePath: string; attachments?: string[]; classId?: string }) => {
+  submitReport: async (data: {
+    filePath: string;
+    attachments?: string[];
+    classId?: string;
+    repoLink?: string;
+    videoLink?: string;
+  }) => {
     const response = await apiClient.post('/submissions/submit', data);
     return response.data.data;
   },

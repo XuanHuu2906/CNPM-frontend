@@ -97,13 +97,19 @@ export default function GradingList() {
       topic = 'Báo cáo cá nhân';
     }
 
-    const score = sub.grades && sub.grades.length > 0 ? Number(sub.grades[0].finalScore) : null;
+    const grade = sub.grades && sub.grades.length > 0 ? sub.grades[0] : null;
+    const score = grade ? Number(grade.finalScore) : null;
+
+    // Khi PĐT đã phê duyệt (grade.isApproved=true) nhưng submission.status chưa kịp cascade
+    // sang HOAN_THANH (bug lịch sử / drift), vẫn hiển thị là "Hoàn thành" để khớp với
+    // bảng phê duyệt của PĐT thay vì giữ "Đang chấm" / "Đã chấm" cũ.
+    const effectiveStatus = grade?.isApproved ? 'HOAN_THANH' : sub.status;
 
     return {
       id: sub.id,
       groupName: name,
       topic: topic || 'Chưa đăng ký đề tài',
-      status: sub.status,
+      status: effectiveStatus,
       submissionDate: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('vi-VN') : '',
       score,
       version: sub.version,

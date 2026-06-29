@@ -63,6 +63,8 @@ export interface Submission {
   version: number;
   editRequestNote?: string;
   rejectReason?: string;
+  repoLink?: string | null;
+  videoLink?: string | null;
   submittedAt: string;
   createdAt: string;
   updatedAt: string;

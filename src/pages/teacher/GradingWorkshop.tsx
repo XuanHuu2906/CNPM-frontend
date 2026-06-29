@@ -500,7 +500,10 @@ export default function GradingWorkshop() {
 
   // YEU_CAU_SUA / TU_CHOI cũng readonly: GV đã yêu cầu SV sửa hoặc bài đã loại
   // → không cho thao tác chấm để tránh ghi đè dữ liệu khi SV nộp lại.
+  // Bổ sung: nếu Grade.isApproved=true (PĐT đã duyệt) mà submission.status chưa kịp
+  // cascade sang HOAN_THANH thì vẫn phải khoá để tránh GV sửa điểm đã duyệt.
   const isReadOnly: boolean = stateData?.readOnly === true ||
+    Boolean(existingGrade?.isApproved) ||
     Boolean(submission && ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH', 'YEU_CAU_SUA', 'TU_CHOI'].includes(submission.status));
 
   if (!stateData) {
@@ -600,6 +603,38 @@ export default function GradingWorkshop() {
                   </div>
                 ) : (
                   <p className="text-slate-400 italic font-normal">Không có tệp đính kèm phụ.</p>
+                )}
+
+                {(submission?.repoLink || submission?.videoLink) && (
+                  <>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-4">Liên kết ngoài:</h3>
+                    <div className="grid grid-cols-1 gap-2 mt-2">
+                      {submission?.repoLink && (
+                        <a
+                          href={submission.repoLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-lg text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          <BookOpen className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span className="truncate flex-1 font-semibold">Source code: {submission.repoLink}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                      {submission?.videoLink && (
+                        <a
+                          href={submission.videoLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-lg text-rose-600 dark:text-rose-400 hover:underline"
+                        >
+                          <BookOpen className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span className="truncate flex-1 font-semibold">Video demo: {submission.videoLink}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
 
