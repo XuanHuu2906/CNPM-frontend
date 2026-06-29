@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   Sliders,
   FileCheck,
-  Percent,
   ShieldCheck,
   Save,
   Loader2,
@@ -67,7 +66,6 @@ export default function SystemSettings() {
     { ext: '.jpg', allowed: false, label: 'Hình ảnh JPG (.jpg)' }
   ]);
 
-  const [similarityWarningThreshold, setSimilarityWarningThreshold] = useState<number>(20);
   const [autoFinalLockEnabled, setAutoFinalLockEnabled] = useState<boolean>(true);
 
   // ==========================================
@@ -134,9 +132,6 @@ export default function SystemSettings() {
           })));
         }
 
-        if (k === 'PLAGIARISM_THRESHOLD' || k === 'SIMILARITY_WARNING_THRESHOLD') {
-          setSimilarityWarningThreshold(Number(v));
-        }
         if (k === 'AUTO_GRADING_LOCK' || k === 'AUTO_FINAL_LOCK_ENABLED') {
           setAutoFinalLockEnabled(v === 'true');
         }
@@ -245,10 +240,6 @@ export default function SystemSettings() {
       toast.error('Số lượng tệp đính kèm tối đa phải nằm trong khoảng từ 1 đến 20!');
       return;
     }
-    if (similarityWarningThreshold < 0 || similarityWarningThreshold > 100) {
-      toast.error('Ngưỡng trùng lặp cảnh báo phải nằm trong khoảng từ 0% đến 100%!');
-      return;
-    }
     if (sessionTimeout <= 0 || sessionTimeout > 1440) {
       toast.error('Thời hạn phiên làm việc phải lớn hơn 0 và không quá 1440 phút (24 giờ)!');
       return;
@@ -293,11 +284,9 @@ export default function SystemSettings() {
         { key: 'MAX_ATTACHMENT_FILES', value: String(maxAttachmentFiles) },
         { key: 'ALLOWED_MAIN_REPORT_EXTENSIONS', value: allowedMain.join(',') },
         { key: 'ALLOWED_ATTACHMENT_EXTENSIONS', value: allowedAttach.join(',') },
-        { key: 'SIMILARITY_WARNING_THRESHOLD', value: String(similarityWarningThreshold) },
         { key: 'AUTO_FINAL_LOCK_ENABLED', value: String(autoFinalLockEnabled) },
 
         { key: 'MAX_FILE_SIZE', value: String(maxMainReportSizeMB) },
-        { key: 'PLAGIARISM_THRESHOLD', value: String(similarityWarningThreshold) },
         { key: 'AUTO_GRADING_LOCK', value: String(autoFinalLockEnabled) },
 
         { key: 'GRADING_SCALE', value: String(gradingScale) },
@@ -447,7 +436,7 @@ export default function SystemSettings() {
       {activeTab !== 'lock' ? (
         <form onSubmit={handleSaveSettings} className="space-y-6">
 
-          {/* TAB 1: FILE & PLAGIARISM */}
+          {/* TAB 1: FILE */}
           {activeTab === 'general' && (
             <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
 
@@ -610,35 +599,6 @@ export default function SystemSettings() {
                 </CardContent>
               </Card>
 
-              {/* Plagiarism Constraints */}
-              <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-                <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-850">
-                  <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                    <Percent className="w-5 h-5 text-violet-500" />
-                    Cảnh báo mức độ tương đồng & trùng lặp nội dung
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="similarity-threshold" className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
-                      Ngưỡng trùng lặp cảnh báo (%) *
-                    </Label>
-                    <div className="relative max-w-xs">
-                      <Input
-                        id="similarity-threshold"
-                        type="number"
-                        value={similarityWarningThreshold}
-                        onChange={e => setSimilarityWarningThreshold(Number(e.target.value))}
-                        className="rounded-xl bg-slate-50 focus:bg-white dark:bg-slate-950 dark:border-slate-800 font-bold pr-12 text-xs"
-                        min={0}
-                        max={100}
-                        required
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           )}
 

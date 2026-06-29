@@ -51,15 +51,17 @@ export default function GradingWorkshop() {
     members: string[];
     version: number;
     classId: string;
+    classCode?: string;
     readOnly?: boolean;
   } | null;
 
-  const { submissionId, groupName, topic, members, classId } = stateData || {
+  const { submissionId, groupName, topic, members, classId, classCode } = stateData || {
     submissionId: '',
     groupName: '',
     topic: '',
     members: [],
     classId: '',
+    classCode: '',
     version: 1
   };
 
@@ -566,7 +568,7 @@ export default function GradingWorkshop() {
               <div className="pb-6 border-b border-slate-100 dark:border-slate-800 text-center">
                 <h2 className="text-base font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">TÊN ĐỀ TÀI: {topic}</h2>
                 <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold mt-2 uppercase tracking-wider">{groupName}</p>
-                <p className="text-xs text-slate-400 font-bold mt-1">Lớp Học phần: {classId}</p>
+                <p className="text-xs text-slate-400 font-bold mt-1">Lớp Học phần: {classCode || classId}</p>
               </div>
 
               <div className="space-y-4 text-xs font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -599,8 +601,7 @@ export default function GradingWorkshop() {
                 )}
               </div>
 
-              <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tình trạng bài nộp: {submission?.status}</span>
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end items-center">
                 {submission?.filePath && (
                   <a
                     href={getFileUrl(submission.filePath)}
@@ -623,301 +624,301 @@ export default function GradingWorkshop() {
           <div className="flex-1 overflow-y-auto p-5 text-left">
             <div className="space-y-6 animate-in fade-in duration-200">
 
-                {/* UC-17 (R12): hiển thị badge nếu điểm nháp do GV phụ trách cũ chấm. */}
-                {existingGrade && existingGrade.teacher && currentTeacherId && existingGrade.teacher.id !== currentTeacherId && (
-                  <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 flex items-start gap-2.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                    <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-200 leading-relaxed">
-                      <div className="font-extrabold uppercase tracking-wide text-[10px]">Bàn giao chấm điểm</div>
-                      <div className="mt-0.5">
-                        Điểm nháp này do <strong>{existingGrade.teacher.user.fullName}</strong> ({existingGrade.teacher.teacherCode}) chấm trước khi Phòng Đào tạo đổi GV phụ trách. Bạn có thể tiếp tục chỉnh sửa hoặc xác nhận chấm xong.
-                      </div>
+              {/* UC-17 (R12): hiển thị badge nếu điểm nháp do GV phụ trách cũ chấm. */}
+              {existingGrade && existingGrade.teacher && currentTeacherId && existingGrade.teacher.id !== currentTeacherId && (
+                <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-200 leading-relaxed">
+                    <div className="font-extrabold uppercase tracking-wide text-[10px]">Bàn giao chấm điểm</div>
+                    <div className="mt-0.5">
+                      Điểm nháp này do <strong>{existingGrade.teacher.user.fullName}</strong> ({existingGrade.teacher.teacherCode}) chấm trước khi Phòng Đào tạo đổi GV phụ trách. Bạn có thể tiếp tục chỉnh sửa hoặc xác nhận chấm xong.
                     </div>
                   </div>
-                )}
-
-                {/* Rubric Selector */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Chọn bảng Rubric chấm điểm</label>
-                  <select
-                    value={selectedRubricId}
-                    onChange={(e) => {
-                      if (existingGrade) {
-                        toast.warning("Báo cáo này đã được áp dụng bảng Rubric cố định và lưu điểm trước đó. Không thể thay đổi.");
-                        return;
-                      }
-                      setSelectedRubricId(e.target.value);
-                    }}
-                    disabled={!!existingGrade || isReadOnly}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/25 text-slate-700 dark:text-slate-300 disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    <option value="">-- Chọn bảng Rubric phù hợp --</option>
-                    {rubrics.map(r => (
-                      <option key={r.id} value={r.id}>{r.title} ({r.criteria.length} tiêu chí)</option>
-                    ))}
-                  </select>
                 </div>
+              )}
 
-                {/* FINAL LIVE SCORE STATUS */}
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white flex items-center justify-between shadow-lg shadow-indigo-500/10">
-                  <div className="space-y-1 text-left">
-                    <h3 className="font-bold text-sm flex items-center gap-1.5">
-                      <Calculator className="w-5 h-5" />
-                      Điểm Số Đồng Bộ
-                    </h3>
-                    <p className="text-[10px] text-indigo-100 font-medium">Tự động cộng dồn theo tỉ lệ phần trăm</p>
-                  </div>
-                  <div className="text-center bg-white/15 px-4 py-2 rounded-xl border border-white/20">
-                    <span className="text-2xl font-black leading-none">{finalScore}</span>
-                    <span className="text-[10px] font-bold block mt-0.5 text-indigo-200">Quy đổi 10</span>
-                  </div>
+              {/* Rubric Selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Chọn bảng Rubric chấm điểm</label>
+                <select
+                  value={selectedRubricId}
+                  onChange={(e) => {
+                    if (existingGrade) {
+                      toast.warning("Báo cáo này đã được áp dụng bảng Rubric cố định và lưu điểm trước đó. Không thể thay đổi.");
+                      return;
+                    }
+                    setSelectedRubricId(e.target.value);
+                  }}
+                  disabled={!!existingGrade || isReadOnly}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/25 text-slate-700 dark:text-slate-300 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <option value="">-- Chọn bảng Rubric phù hợp --</option>
+                  {rubrics.map(r => (
+                    <option key={r.id} value={r.id}>{r.title} ({r.criteria.length} tiêu chí)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* FINAL LIVE SCORE STATUS */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white flex items-center justify-between shadow-lg shadow-indigo-500/10">
+                <div className="space-y-1 text-left">
+                  <h3 className="font-bold text-sm flex items-center gap-1.5">
+                    <Calculator className="w-5 h-5" />
+                    Điểm Số Đồng Bộ
+                  </h3>
+                  <p className="text-[10px] text-indigo-100 font-medium">Tự động cộng dồn theo tỉ lệ phần trăm</p>
                 </div>
-
-                {/* CRITERIA INPUT SCROLL AREA */}
-                <div className="space-y-5">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tiêu chí chi tiết từ Rubric</h4>
-
-                  {gradingItems.length > 0 ? (
-                    gradingItems.map((item) => (
-                      <div key={item.id} className="p-4 border border-slate-100 dark:border-slate-800 rounded-xl space-y-3 bg-slate-50/20 dark:bg-slate-900/10">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-0.5 text-left">
-                            <h5 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{item.name}</h5>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{item.description}</p>
-                          </div>
-                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-lg shrink-0">
-                            {item.weight}%
-                          </span>
-                        </div>
-
-                        {/* Slide score config */}
-                        <div className="flex items-center gap-4">
-                          <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            value={item.score}
-                            onChange={(e) => handleScoreChange(item.id, Number(e.target.value))}
-                            disabled={isReadOnly}
-                            className="flex-1 accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                          />
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            value={item.score}
-                            onChange={(e) => handleScoreChange(item.id, Number(e.target.value))}
-                            disabled={isReadOnly}
-                            className="w-14 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-black text-center text-indigo-600 dark:text-indigo-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                          />
-                        </div>
-
-                        {/* Feedback text input */}
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={item.comment}
-                            placeholder="Nhận xét tóm tắt của phần này..."
-                            onChange={(e) => handleCommentChange(item.id, e.target.value)}
-                            disabled={isReadOnly}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 text-[11px] focus:outline-none text-slate-600 dark:text-slate-400 disabled:opacity-70 disabled:cursor-not-allowed"
-                          />
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-8 text-center text-slate-400 font-semibold text-xs border border-dashed rounded-xl">
-                      Vui lòng lựa chọn một bảng Rubric ở trên để nạp khung điểm chấm.
-                    </div>
-                  )}
-                </div>
-
-                {/* GENERAL FEEDBACK */}
-                <div className="space-y-1.5 pt-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nhận xét tổng hợp của Giảng viên</label>
-                  <textarea
-                    rows={3}
-                    value={generalFeedback}
-                    onChange={(e) => setGeneralFeedback(e.target.value)}
-                    placeholder="Nhập nhận xét tổng quan về chất lượng đồ án, báo cáo..."
-                    disabled={isReadOnly}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                {/* UC-09 / UC-I05 EXT: Hệ số đóng góp từng thành viên — chỉ hiện cho bài nhóm
-                    và sau khi đã có Grade. Đóng băng nếu submission chuyển sang CHO_DUYET/HOAN_THANH. */}
-                {memberScores && memberScores.length > 0 && (
-                  <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-indigo-500" />
-                      <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                        Phân chia đóng góp nhóm
-                      </h4>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-semibold leading-snug">
-                      Điểm cá nhân = điểm nhóm × hệ số (0–1.5, mặc định 1.0). Áp dụng trước khi gửi duyệt; khóa khi PĐT đang/đã duyệt.
-                    </p>
-
-                    {memberLoadError && (
-                      <div className="text-[10px] font-semibold text-rose-600">{memberLoadError}</div>
-                    )}
-
-                    <div className="space-y-2">
-                      {memberScores.map((m) => {
-                        const draftFactor = memberFactorDraft[m.studentId] ?? m.contributionFactor;
-                        const preview = Math.round(Math.max(0, Math.min(10, (memberGroupScore ?? 0) * Number(draftFactor || 0))) * 100) / 100;
-                        return (
-                          <div key={m.studentId} className="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/10">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 min-w-0">
-                                <div className="truncate">{m.fullName ?? m.studentId}</div>
-                                <div className="text-[9px] text-slate-400 font-extrabold uppercase">{m.studentCode ?? '—'}</div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <input
-                                  type="number"
-                                  step="0.05"
-                                  min={0}
-                                  max={1.5}
-                                  value={draftFactor}
-                                  disabled={isReadOnly}
-                                  onChange={(e) => setMemberFactorDraft((prev) => ({ ...prev, [m.studentId]: Number(e.target.value) }))}
-                                  className="w-16 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-bold text-right disabled:opacity-60"
-                                />
-                                <span className="text-[10px] font-semibold text-slate-400">→</span>
-                                <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 w-12 text-right">
-                                  {preview.toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                            <input
-                              type="text"
-                              value={memberNoteDraft[m.studentId] ?? ''}
-                              disabled={isReadOnly}
-                              onChange={(e) => setMemberNoteDraft((prev) => ({ ...prev, [m.studentId]: e.target.value }))}
-                              placeholder="Ghi chú (tuỳ chọn)"
-                              className="mt-1.5 w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-[11px] font-semibold disabled:opacity-60"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={memberSaving || isReadOnly}
-                      onClick={handleSaveMemberAdjustments}
-                      className="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[11px] font-bold cursor-pointer"
-                    >
-                      {memberSaving ? 'Đang lưu…' : 'Lưu hệ số đóng góp'}
-                    </button>
-                  </div>
-                )}
-
-                {/* B20: INTERNAL NOTES (Ghi chú nội bộ giảng viên) */}
-                <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowNotesPanel((v) => !v)}
-                    className="w-full flex items-center justify-between text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <StickyNote className="w-4 h-4 text-amber-500" />
-                      <span className="text-xs font-black text-slate-700 dark:text-slate-300">
-                        Ghi chú nội bộ giảng viên
-                      </span>
-                      {internalNotes.length > 0 && (
-                        <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
-                          {internalNotes.length}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {showNotesPanel ? 'Ẩn' : 'Hiện'}
-                    </span>
-                  </button>
-
-                  {showNotesPanel && (
-                    <div className="space-y-3 mt-2">
-                      <p className="text-[10px] text-slate-400 font-semibold leading-snug">
-                        Chỉ giảng viên/PĐT/Admin thấy. Sinh viên không truy cập được.
-                      </p>
-
-                      {/* Danh sách ghi chú */}
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {notesLoading ? (
-                          <div className="flex items-center justify-center py-4 text-slate-400">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          </div>
-                        ) : internalNotes.length === 0 ? (
-                          <div className="py-3 text-center text-slate-400 font-semibold text-[11px] border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
-                            Chưa có ghi chú nội bộ nào.
-                          </div>
-                        ) : (
-                          internalNotes.map((note) => (
-                            <div
-                              key={note.id}
-                              className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-amber-50/40 dark:bg-amber-950/10 space-y-1.5"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                                  {note.user?.fullName || 'Giảng viên'}
-                                  {note.user?.role && (
-                                    <span className="ml-2 text-[9px] text-slate-400 font-semibold">
-                                      ({note.user.role})
-                                    </span>
-                                  )}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteInternalNote(note.id)}
-                                  className="text-rose-400 hover:text-rose-600 transition"
-                                  title="Xoá ghi chú"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                              <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
-                                {note.content}
-                              </p>
-                              <p className="text-[9px] text-slate-400 font-semibold">
-                                {new Date(note.createdAt).toLocaleString('vi-VN')}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-
-                      {/* Thêm ghi chú mới */}
-                      <div className="flex gap-2 items-start">
-                        <textarea
-                          rows={2}
-                          value={newNoteContent}
-                          onChange={(e) => setNewNoteContent(e.target.value)}
-                          placeholder="Ghi chú nội bộ (chỉ GV thấy)..."
-                          className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddInternalNote}
-                          disabled={noteSubmitting || newNoteContent.trim().length < 2}
-                          className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1"
-                          title="Thêm ghi chú"
-                        >
-                          {noteSubmitting ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Send className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                <div className="text-center bg-white/15 px-4 py-2 rounded-xl border border-white/20">
+                  <span className="text-2xl font-black leading-none">{finalScore}</span>
+                  <span className="text-[10px] font-bold block mt-0.5 text-indigo-200">Quy đổi 10</span>
                 </div>
               </div>
+
+              {/* CRITERIA INPUT SCROLL AREA */}
+              <div className="space-y-5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tiêu chí chi tiết từ Rubric</h4>
+
+                {gradingItems.length > 0 ? (
+                  gradingItems.map((item) => (
+                    <div key={item.id} className="p-4 border border-slate-100 dark:border-slate-800 rounded-xl space-y-3 bg-slate-50/20 dark:bg-slate-900/10">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-0.5 text-left">
+                          <h5 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{item.name}</h5>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{item.description}</p>
+                        </div>
+                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-lg shrink-0">
+                          {item.weight}%
+                        </span>
+                      </div>
+
+                      {/* Slide score config */}
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          step="0.5"
+                          value={item.score}
+                          onChange={(e) => handleScoreChange(item.id, Number(e.target.value))}
+                          disabled={isReadOnly}
+                          className="flex-1 accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="0.5"
+                          value={item.score}
+                          onChange={(e) => handleScoreChange(item.id, Number(e.target.value))}
+                          disabled={isReadOnly}
+                          className="w-14 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-black text-center text-indigo-600 dark:text-indigo-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Feedback text input */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={item.comment}
+                          placeholder="Nhận xét tóm tắt của phần này..."
+                          onChange={(e) => handleCommentChange(item.id, e.target.value)}
+                          disabled={isReadOnly}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 text-[11px] focus:outline-none text-slate-600 dark:text-slate-400 disabled:opacity-70 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-slate-400 font-semibold text-xs border border-dashed rounded-xl">
+                    Vui lòng lựa chọn một bảng Rubric ở trên để nạp khung điểm chấm.
+                  </div>
+                )}
+              </div>
+
+              {/* GENERAL FEEDBACK */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nhận xét tổng hợp của Giảng viên</label>
+                <textarea
+                  rows={3}
+                  value={generalFeedback}
+                  onChange={(e) => setGeneralFeedback(e.target.value)}
+                  placeholder="Nhập nhận xét tổng quan về chất lượng đồ án, báo cáo..."
+                  disabled={isReadOnly}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              {/* UC-09 / UC-I05 EXT: Hệ số đóng góp từng thành viên — chỉ hiện cho bài nhóm
+                    và sau khi đã có Grade. Đóng băng nếu submission chuyển sang CHO_DUYET/HOAN_THANH. */}
+              {memberScores && memberScores.length > 0 && (
+                <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-500" />
+                    <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Phân chia đóng góp nhóm
+                    </h4>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-semibold leading-snug">
+                    Điểm cá nhân = điểm nhóm × hệ số (0–1.5, mặc định 1.0). Áp dụng trước khi gửi duyệt; khóa khi PĐT đang/đã duyệt.
+                  </p>
+
+                  {memberLoadError && (
+                    <div className="text-[10px] font-semibold text-rose-600">{memberLoadError}</div>
+                  )}
+
+                  <div className="space-y-2">
+                    {memberScores.map((m) => {
+                      const draftFactor = memberFactorDraft[m.studentId] ?? m.contributionFactor;
+                      const preview = Math.round(Math.max(0, Math.min(10, (memberGroupScore ?? 0) * Number(draftFactor || 0))) * 100) / 100;
+                      return (
+                        <div key={m.studentId} className="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/10">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 min-w-0">
+                              <div className="truncate">{m.fullName ?? m.studentId}</div>
+                              <div className="text-[9px] text-slate-400 font-extrabold uppercase">{m.studentCode ?? '—'}</div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <input
+                                type="number"
+                                step="0.05"
+                                min={0}
+                                max={1.5}
+                                value={draftFactor}
+                                disabled={isReadOnly}
+                                onChange={(e) => setMemberFactorDraft((prev) => ({ ...prev, [m.studentId]: Number(e.target.value) }))}
+                                className="w-16 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-bold text-right disabled:opacity-60"
+                              />
+                              <span className="text-[10px] font-semibold text-slate-400">→</span>
+                              <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 w-12 text-right">
+                                {preview.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={memberNoteDraft[m.studentId] ?? ''}
+                            disabled={isReadOnly}
+                            onChange={(e) => setMemberNoteDraft((prev) => ({ ...prev, [m.studentId]: e.target.value }))}
+                            placeholder="Ghi chú (tuỳ chọn)"
+                            className="mt-1.5 w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-[11px] font-semibold disabled:opacity-60"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={memberSaving || isReadOnly}
+                    onClick={handleSaveMemberAdjustments}
+                    className="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[11px] font-bold cursor-pointer"
+                  >
+                    {memberSaving ? 'Đang lưu…' : 'Lưu hệ số đóng góp'}
+                  </button>
+                </div>
+              )}
+
+              {/* B20: INTERNAL NOTES (Ghi chú nội bộ giảng viên) */}
+              <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowNotesPanel((v) => !v)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <StickyNote className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs font-black text-slate-700 dark:text-slate-300">
+                      Ghi chú nội bộ giảng viên
+                    </span>
+                    {internalNotes.length > 0 && (
+                      <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                        {internalNotes.length}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {showNotesPanel ? 'Ẩn' : 'Hiện'}
+                  </span>
+                </button>
+
+                {showNotesPanel && (
+                  <div className="space-y-3 mt-2">
+                    <p className="text-[10px] text-slate-400 font-semibold leading-snug">
+                      Chỉ giảng viên/PĐT/Admin thấy. Sinh viên không truy cập được.
+                    </p>
+
+                    {/* Danh sách ghi chú */}
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {notesLoading ? (
+                        <div className="flex items-center justify-center py-4 text-slate-400">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        </div>
+                      ) : internalNotes.length === 0 ? (
+                        <div className="py-3 text-center text-slate-400 font-semibold text-[11px] border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
+                          Chưa có ghi chú nội bộ nào.
+                        </div>
+                      ) : (
+                        internalNotes.map((note) => (
+                          <div
+                            key={note.id}
+                            className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-amber-50/40 dark:bg-amber-950/10 space-y-1.5"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                {note.user?.fullName || 'Giảng viên'}
+                                {note.user?.role && (
+                                  <span className="ml-2 text-[9px] text-slate-400 font-semibold">
+                                    ({note.user.role})
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteInternalNote(note.id)}
+                                className="text-rose-400 hover:text-rose-600 transition"
+                                title="Xoá ghi chú"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
+                              {note.content}
+                            </p>
+                            <p className="text-[9px] text-slate-400 font-semibold">
+                              {new Date(note.createdAt).toLocaleString('vi-VN')}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Thêm ghi chú mới */}
+                    <div className="flex gap-2 items-start">
+                      <textarea
+                        rows={2}
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        placeholder="Ghi chú nội bộ (chỉ GV thấy)..."
+                        className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddInternalNote}
+                        disabled={noteSubmitting || newNoteContent.trim().length < 2}
+                        className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1"
+                        title="Thêm ghi chú"
+                      >
+                        {noteSubmitting ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           {/* ACTION BUTTON PANEL */}
           {!isReadOnly ? (
