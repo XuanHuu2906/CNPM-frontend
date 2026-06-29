@@ -60,6 +60,13 @@ export default function StudentSubmit() {
   const [requestReason, setRequestReason] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
 
+  // UC-25: Grade Appeal (Phúc khảo). Mỗi submission 1 đơn duy nhất, cửa sổ 14 ngày.
+  const [appealForSubmission, setAppealForSubmission] = useState<any | null>(null);
+  const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
+  const [appealReason, setAppealReason] = useState('');
+  const [isAppealing, setIsAppealing] = useState(false);
+  const APPEAL_WINDOW_DAYS = 14;
+
   // Liên kết ngoài: source code (GitHub/GitLab) & video demo (YouTube/Drive).
   const [repoLink, setRepoLink] = useState('');
   const [videoLink, setVideoLink] = useState('');
@@ -171,6 +178,15 @@ export default function StudentSubmit() {
           }
         } catch (err) {
           console.error("Lỗi lấy danh sách yêu cầu nộp lại:", err);
+        }
+
+        // UC-25: Đơn phúc khảo (nếu có) — 1 đơn / submission.
+        try {
+          const appeals = await studentService.getMyGradeAppeals();
+          const match = Array.isArray(appeals) ? appeals.find((a: any) => a.submissionId === subData.id) : null;
+          setAppealForSubmission(match || null);
+        } catch (err) {
+          console.error("Lỗi lấy danh sách phúc khảo:", err);
         }
 
         setUploadedFiles(files);
@@ -344,6 +360,51 @@ export default function StudentSubmit() {
     }
   };
 
+  // UC-25: SV gửi phúc khảo.
+  const handleSubmitAppeal = async () => {
+    const trimmed = appealReason.trim();
+    if (trimmed.length < 20) {
+      toast.warning('Lý do phúc khảo phải có ít nhất 20 ký tự.');
+      return;
+    }
+    if (!submission?.id) return;
+    try {
+      setIsAppealing(true);
+      await studentService.createGradeAppeal(submission.id, trimmed);
+      toast.success('Đã gửi yêu cầu phúc khảo tới Phòng Đào tạo.');
+      setIsAppealModalOpen(false);
+      setAppealReason('');
+      await loadSubmission();
+    } catch (error: any) {
+      console.error('Lỗi gửi phúc khảo:', error);
+      toast.error(error.response?.data?.message || 'Gửi phúc khảo thất bại.');
+    } finally {
+      setIsAppealing(false);
+    }
+  };
+
+  // Tính ngày bài chuyển sang HOAN_THANH (từ statusLogs gần nhất) để biết còn cửa sổ
+  // phúc khảo hay không.
+  const getHoanThanhAt = (): Date | null => {
+    const logs = (submission as any)?.statusLogs as Array<any> | undefined;
+    if (Array.isArray(logs) && logs.length) {
+      const sorted = [...logs].sort(
+        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      const log = sorted.find((l: any) => l.newStatus === 'DA_CHAM');
+      if (log) return new Date(log.createdAt);
+    }
+    if ((submission as any)?.updatedAt) return new Date((submission as any).updatedAt);
+    return null;
+  };
+  const hoanThanhAt = getHoanThanhAt();
+  const appealDeadline = hoanThanhAt
+    ? new Date(hoanThanhAt.getTime() + APPEAL_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    : null;
+  const isAppealWindowOpen = appealDeadline ? new Date() <= appealDeadline : false;
+  const canCreateAppeal =
+    submission?.status === 'DA_CHAM' && isAppealWindowOpen && !appealForSubmission;
+
   if (profileLoading || loading) {
     return (
       <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4">
@@ -465,6 +526,83 @@ export default function StudentSubmit() {
                   <span className="font-bold">Lý do:</span> {pendingRequest.reason}
                 </p>
               </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* UC-25: APPEAL BANNER — chỉ hiện khi bài HOAN_THANH */}
+      {submission?.status === 'DA_CHAM' && (
+        <Card className={`border-l-4 ${
+          appealForSubmission?.status === 'APPROVED'
+            ? 'border-l-emerald-500'
+            : appealForSubmission?.status === 'REJECTED'
+              ? 'border-l-rose-500'
+              : appealForSubmission?.status === 'PENDING'
+                ? 'border-l-amber-500'
+                : 'border-l-violet-500'
+        } border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md p-6 rounded-2xl relative overflow-hidden`}>
+          <div className="flex gap-4 items-start">
+            <div className="p-2.5 bg-violet-50 dark:bg-violet-950/30 text-violet-500 rounded-xl shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-3 flex-1">
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base">
+                  {appealForSubmission ? 'Yêu cầu phúc khảo' : 'Phúc khảo điểm'}
+                </h3>
+                <p className="text-xs text-muted-foreground font-semibold mt-0.5">
+                  {appealForSubmission
+                    ? `Đã gửi: ${new Date(appealForSubmission.createdAt).toLocaleString('vi-VN')}`
+                    : appealDeadline
+                      ? `Hạn cuối phúc khảo: ${appealDeadline.toLocaleDateString('vi-VN')}`
+                      : 'Cửa sổ phúc khảo 14 ngày kể từ khi điểm được duyệt.'}
+                </p>
+              </div>
+
+              {appealForSubmission ? (
+                <div className="space-y-2">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      <span className="font-bold">Lý do của bạn:</span> {appealForSubmission.reason}
+                    </p>
+                    <p className="text-sm font-bold">
+                      Trạng thái:{' '}
+                      {appealForSubmission.status === 'PENDING' && (
+                        <span className="text-amber-600">Đang chờ Phòng Đào tạo duyệt</span>
+                      )}
+                      {appealForSubmission.status === 'APPROVED' && (
+                        <span className="text-emerald-600">Đã được duyệt — bài sẽ được chấm lại</span>
+                      )}
+                      {appealForSubmission.status === 'REJECTED' && (
+                        <span className="text-rose-600">Bị từ chối</span>
+                      )}
+                    </p>
+                    {appealForSubmission.reviewNote && (
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                        <span className="font-bold">Phản hồi PĐT:</span> {appealForSubmission.reviewNote}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                    Nếu bạn chưa đồng ý với kết quả chấm, gửi đơn phúc khảo trong vòng {APPEAL_WINDOW_DAYS} ngày kể từ khi điểm được duyệt. Mỗi bài chỉ được gửi <strong>1 đơn duy nhất</strong>.
+                  </p>
+                  <button
+                    onClick={() => setIsAppealModalOpen(true)}
+                    disabled={!canCreateAppeal}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-violet-500/20"
+                  >
+                    <Send className="w-4 h-4" />
+                    Gửi yêu cầu phúc khảo
+                  </button>
+                  {!isAppealWindowOpen && (
+                    <p className="text-xs font-bold text-rose-500">Đã quá hạn phúc khảo.</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -723,10 +861,6 @@ export default function StudentSubmit() {
                     return { text: 'Từ chối báo cáo', bg: 'bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400', dot: 'bg-rose-600' };
                   case 'DA_CHAM':
                     return { text: 'Đã chấm điểm xong', bg: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40', dot: 'bg-emerald-500' };
-                  case 'CHO_DUYET':
-                    return { text: 'Chờ duyệt', bg: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40', dot: 'bg-amber-500' };
-                  case 'HOAN_THANH':
-                    return { text: 'Hồ sơ hoàn tất', bg: 'bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 border border-violet-100 dark:border-violet-900/40', dot: 'bg-violet-500' };
                   default:
                     return { text: status, bg: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400' };
                 }
@@ -803,6 +937,58 @@ export default function StudentSubmit() {
               >
                 {isRequesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Gửi yêu cầu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UC-25: APPEAL MODAL */}
+      {isAppealModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="text-xl font-black text-slate-800 dark:text-slate-100">Yêu cầu phúc khảo điểm</h3>
+              <button
+                onClick={() => setIsAppealModalOpen(false)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-left">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                Đơn này sẽ được gửi trực tiếp tới Phòng Đào tạo. Nếu được duyệt, bài sẽ chuyển về trạng thái <span className="font-bold text-indigo-600">Đang chấm</span> để giảng viên chấm lại. Mỗi bài chỉ được gửi <span className="font-bold">1 đơn</span>.
+              </p>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  Lý do phúc khảo <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  value={appealReason}
+                  onChange={(e) => setAppealReason(e.target.value)}
+                  placeholder="Mô tả cụ thể: điểm tiêu chí nào chưa hợp lý, lý do bạn cho rằng bài xứng đáng điểm cao hơn..."
+                  className="w-full h-32 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-sm font-medium text-slate-700 dark:text-slate-300 resize-none transition-all"
+                />
+                <p className="text-[11px] font-bold text-slate-400">
+                  Tối thiểu 20 ký tự ({appealReason.trim().length}/20)
+                </p>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setIsAppealModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleSubmitAppeal}
+                disabled={isAppealing || appealReason.trim().length < 20}
+                className="px-5 py-2.5 rounded-xl font-bold text-sm bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-md shadow-violet-500/20"
+              >
+                {isAppealing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Gửi phúc khảo
               </button>
             </div>
           </div>

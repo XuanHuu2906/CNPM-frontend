@@ -41,8 +41,8 @@ export default function StudentEvaluation() {
       const subData: SubmissionDetail = await studentService.getMySubmission(profile?.student?.classId);
       setSubmission(subData);
 
-      // UC-09 / UC-I05 EXT: nếu bài đã HOAN_THANH và là bài nhóm, lấy điểm cá nhân.
-      if ((subData as any)?.id && (subData as any)?.status === 'HOAN_THANH' && (subData as any)?.groupId) {
+      // UC-09 / UC-I05 EXT: nếu bài đã DA_CHAM và là bài nhóm, lấy điểm cá nhân.
+      if ((subData as any)?.id && (subData as any)?.status === 'DA_CHAM' && (subData as any)?.groupId) {
         try {
           const res = await apiClient.get(`/grades/submission/${(subData as any).id}/with-adjustments`);
           const data = res.data?.data;
@@ -164,26 +164,7 @@ export default function StudentEvaluation() {
     );
   }
 
-  // STATE 4: DA_CHAM or CHO_DUYET — grades exist but not yet approved, don't show
-  if (submission.status === 'DA_CHAM' || submission.status === 'CHO_DUYET') {
-    return (
-      <div className="space-y-8 animate-in fade-in duration-500 text-left max-w-5xl mx-auto">
-        <div className="h-[60vh] w-full flex flex-col items-center justify-center text-center gap-4 border border-dashed rounded-3xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/10 p-8">
-          <Clock className="w-12 h-12 text-amber-500 animate-pulse" />
-          <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">
-            {submission.status === 'CHO_DUYET' ? 'Kết quả chờ phê duyệt' : 'Đang chờ xử lý'}
-          </h3>
-          <p className="text-sm font-medium text-slate-500 max-w-sm leading-relaxed">
-            {submission.status === 'CHO_DUYET'
-              ? 'Kết quả chưa được phê duyệt. Điểm sẽ được hiển thị sau khi Phòng Đào tạo phê duyệt chính thức.'
-              : 'Bài nộp của bạn đã được chấm điểm và đang chuyển sang bước phê duyệt. Vui lòng chờ kết quả chính thức.'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // STATE 5 (Final): HOAN_THANH — show grades. If DA_NOP or DANG_CHAM, hide old grades.
+  // DA_CHAM = terminal, show grades. Nếu DA_NOP/DANG_CHAM, ẩn điểm cũ.
   const latestGrade = submission?.grades?.[0];
 
   if (submission.status === 'DA_NOP' || submission.status === 'DANG_CHAM' || !latestGrade) {

@@ -121,8 +121,6 @@ export default function StudentDashboard() {
       case 'YEU_CAU_SUA': return 'Yêu cầu sửa';
       case 'TU_CHOI': return 'Từ chối';
       case 'DA_CHAM': return 'Đã chấm';
-      case 'CHO_DUYET': return 'Chờ duyệt';
-      case 'HOAN_THANH': return 'Hoàn thành';
       default: return 'Chưa nộp';
     }
   };
@@ -132,9 +130,7 @@ export default function StudentDashboard() {
     { label: 'Đã nộp' },
     { label: 'Đang chấm' },
     { label: 'Yêu cầu sửa' },
-    { label: 'Đã chấm' },
-    { label: 'Chờ duyệt' },
-    { label: 'Hoàn thành' }
+    { label: 'Đã chấm' }
   ];
 
   const getStepState = (stepLabel: string) => {
@@ -143,9 +139,7 @@ export default function StudentDashboard() {
       'DA_NOP': 1,
       'DANG_CHAM': 2,
       'YEU_CAU_SUA': 3,
-      'DA_CHAM': 4,
-      'CHO_DUYET': 5,
-      'HOAN_THANH': 6
+      'DA_CHAM': 4
     };
 
     if (status === 'TU_CHOI') {
@@ -163,12 +157,15 @@ export default function StudentDashboard() {
       return currentOrder >= 3 ? 'completed' : 'pending';
     }
     if (stepLabel === 'Đã chấm') return currentOrder >= 4 ? 'completed' : 'pending';
-    if (stepLabel === 'Chờ duyệt') return currentOrder >= 5 ? 'completed' : 'pending';
-    if (stepLabel === 'Hoàn thành') return currentOrder >= 6 ? 'completed' : 'pending';
     return 'pending';
   };
 
   const getStepDate = (stepLabel: string) => {
+    const state = getStepState(stepLabel);
+    if (state === 'pending') {
+      return '';
+    }
+
     if (!submission?.statusLogs) {
       if (stepLabel === 'Chưa nộp' && profile?.student?.class?.term?.startDate) {
         return new Date(profile.student.class.term.startDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
@@ -190,10 +187,6 @@ export default function StudentDashboard() {
       log = logs.find((l: any) => l.newStatus === 'YEU_CAU_SUA' || l.newStatus === 'TU_CHOI');
     } else if (stepLabel === 'Đã chấm') {
       log = logs.find((l: any) => l.newStatus === 'DA_CHAM');
-    } else if (stepLabel === 'Chờ duyệt') {
-      log = logs.find((l: any) => l.newStatus === 'CHO_DUYET');
-    } else if (stepLabel === 'Hoàn thành') {
-      log = logs.find((l: any) => l.newStatus === 'HOAN_THANH');
     }
 
     if (log) {
@@ -476,61 +469,15 @@ export default function StudentDashboard() {
         )}
 
         {status === 'DA_CHAM' && (
-          <div className="p-6 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex gap-4">
-              <div className="p-3 bg-emerald-100 dark:bg-emerald-950/40 rounded-xl shrink-0">
-                <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-              </div>
-              <div className="space-y-1.5 text-left">
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">Đã chấm điểm xong</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                  Giảng viên đã hoàn tất chấm điểm. Kết quả đang chờ Phòng Đào tạo phê duyệt.
-                </p>
-              </div>
-            </div>
-            <button
-              disabled
-              className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl font-bold text-sm shrink-0 cursor-not-allowed"
-            >
-              <Clock className="w-4 h-4" />
-              Chờ phê duyệt
-            </button>
-          </div>
-        )}
-
-        {status === 'CHO_DUYET' && (
-          <div className="p-6 rounded-2xl bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex gap-4">
-              <div className="p-3 bg-amber-100 dark:bg-amber-950/40 rounded-xl shrink-0">
-                <Clock className="w-6 h-6 text-amber-500" />
-              </div>
-              <div className="space-y-1.5 text-left">
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">Kết quả chờ phê duyệt</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                  Điểm số đã được giảng viên nhập và đang chờ Phòng Đào tạo phê duyệt chính thức.
-                </p>
-              </div>
-            </div>
-            <button
-              disabled
-              className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl font-bold text-sm shrink-0 cursor-not-allowed"
-            >
-              <Clock className="w-4 h-4" />
-              Đang chờ duyệt
-            </button>
-          </div>
-        )}
-
-        {status === 'HOAN_THANH' && (
           <div className="p-6 rounded-2xl bg-teal-50/50 dark:bg-teal-950/10 border border-teal-100 dark:border-teal-900/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex gap-4">
               <div className="p-3 bg-teal-100 dark:bg-teal-950/40 rounded-xl shrink-0">
                 <Award className="w-6 h-6 text-teal-600 dark:text-teal-400" />
               </div>
               <div className="space-y-1.5 text-left">
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">Hoàn thành đánh giá học tập</h4>
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">Đã có kết quả chấm điểm</h4>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                  Bài báo cáo của bạn đã được nhập điểm chính thức lên hệ thống đào tạo. Bạn có thể xem bảng điểm Rubric và lời phê chi tiết.
+                  Giảng viên đã chấm xong bài báo cáo của bạn. Bạn có thể xem bảng điểm Rubric và lời phê chi tiết.
                 </p>
               </div>
             </div>

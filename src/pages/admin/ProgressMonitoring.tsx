@@ -208,9 +208,9 @@ export default function ProgressMonitoring() {
 
   // Tính toán số liệu thống kê (Stats Cards)
   const totalCount = submissions.length;
-  const completedCount = submissions.filter(s => s.status === 'HOAN_THANH').length;
+  const completedCount = submissions.filter(s => s.status === 'DA_CHAM').length;
   const pendingGradingCount = submissions.filter(s => ['DA_NOP', 'DANG_CHAM', 'YEU_CAU_SUA'].includes(s.status)).length;
-  const pendingApprovalCount = submissions.filter(s => s.status === 'CHO_DUYET').length;
+  const pendingApprovalCount = 0;
   const rejectedCount = submissions.filter(s => s.status === 'TU_CHOI').length;
 
   // Xử lý nộp quyết định từ chối vi phạm (Reject - TU_CHOI)
@@ -315,16 +315,10 @@ export default function ProgressMonitoring() {
     }
 
     switch (status) {
-      case 'HOAN_THANH':
+      case 'DA_CHAM':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/40 shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" /> Đã phê duyệt
-          </span>
-        );
-      case 'CHO_DUYET':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/40 shadow-sm animate-pulse">
-            <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" /> Chờ PĐT duyệt
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" /> Đã chấm
           </span>
         );
       case 'YEU_CAU_SUA':
@@ -337,12 +331,6 @@ export default function ProgressMonitoring() {
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/40 shadow-sm">
             <AlertOctagon className="w-3.5 h-3.5 text-rose-500 shrink-0" /> Bị từ chối
-          </span>
-        );
-      case 'DA_CHAM':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40 shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Đã chấm điểm
           </span>
         );
       case 'DANG_CHAM':
@@ -543,8 +531,6 @@ export default function ProgressMonitoring() {
                 <option value="CHO_KIEM_TRA">Chờ Admin/GV kiểm tra</option>
                 <option value="YEU_CAU_SUA">Yêu cầu sửa điểm/nội dung</option>
                 <option value="DA_CHAM">Đã chấm điểm</option>
-                <option value="CHO_DUYET">Chờ PĐT duyệt</option>
-                <option value="HOAN_THANH">Đã phê duyệt</option>
                 <option value="TU_CHOI">Bị từ chối</option>
               </select>
             </div>

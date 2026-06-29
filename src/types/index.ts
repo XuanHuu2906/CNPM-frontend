@@ -167,8 +167,6 @@ export type SubmissionStatus =
   | 'DANG_CHAM'
   | 'YEU_CAU_SUA'
   | 'DA_CHAM'
-  | 'CHO_DUYET'
-  | 'HOAN_THANH'
   | 'TU_CHOI';
 
 // Interface nghiệp vụ dùng ở Frontend (đã tinh gọn từ Join nhiều bảng)

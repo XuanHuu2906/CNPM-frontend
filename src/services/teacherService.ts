@@ -89,11 +89,6 @@ export interface Submission {
       };
     }>;
   };
-  reopenRequests?: Array<{
-    id: string;
-    status: string;
-    reason?: string;
-  }>;
 }
 
 export interface Grade {
@@ -104,7 +99,6 @@ export interface Grade {
   detailedScores: Array<{ criteriaId: string; score: number; note?: string }>;
   finalScore: number;
   feedback?: string;
-  isApproved: boolean;
   version: number;
   // UC-17 (R12): GV đã chấm nháp — có thể khác GV phụ trách lớp hiện tại nếu PĐT đã đổi GV.
   teacher?: {
@@ -181,18 +175,6 @@ export const teacherService = {
     return response.data.data;
   },
 
-  // UC-16 (BATCH): GV gửi duyệt cả lớp — chuyển mọi DA_CHAM trong lớp sang CHO_DUYET.
-  submitClassForReview: async (classId: string): Promise<{
-    classId: string;
-    movedCount: number;
-    skippedCount: number;
-    failedCount: number;
-    skipped: Array<{ submissionId: string; reason: string }>;
-  }> => {
-    const response = await apiClient.post(`/teacher/class-sections/${classId}/submit-for-review`);
-    return response.data.data;
-  },
-
   /**
    * Lấy danh sách Rubric của giảng viên
    */
@@ -241,14 +223,6 @@ export const teacherService = {
    */
   approveResubmissionRequest: async (id: string): Promise<any> => {
     const response = await apiClient.patch(`/teacher/resubmission-requests/${id}/approve`);
-    return response.data.data;
-  },
-
-  /**
-   * Tạo yêu cầu mở lại bài nộp
-   */
-  createReopenRequest: async (submissionId: string, reason: string): Promise<any> => {
-    const response = await apiClient.post(`/teacher/submissions/${submissionId}/reopen-request`, { reason });
     return response.data.data;
   },
 

@@ -19,7 +19,6 @@ import {
   ShieldAlert,
   AlertTriangle,
   Check,
-  RefreshCcw,
   CheckCircle2,
   Award,
   XCircle,
@@ -102,14 +101,9 @@ export default function AcademicLayout() {
       icon: BarChart3
     },
     {
-      title: 'Phê duyệt kết quả',
+      title: 'Rà soát & Phúc khảo',
       path: '/academic/approvals',
       icon: FileCheck2
-    },
-    {
-      title: 'Yêu cầu mở lại',
-      path: '/academic/reopen-requests',
-      icon: RefreshCcw
     },
     {
       title: 'Điều phối giảng dạy',

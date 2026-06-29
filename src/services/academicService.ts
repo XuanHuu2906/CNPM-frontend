@@ -166,25 +166,29 @@ export const academicService = {
   },
 
   /**
-   * Quản lý Yêu cầu mở lại chấm điểm
+   * UC-25: Yêu cầu phúc khảo điểm của sinh viên
    */
-  getGradingReopenRequests: async (filters?: any): Promise<any> => {
+  getGradeAppeals: async (filters?: { status?: string; classId?: string }): Promise<any> => {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
     if (filters?.classId) params.append('classId', filters.classId);
-    if (filters?.semesterId) params.append('semesterId', filters.semesterId);
-
-    const response = await apiClient.get(`/academic/grading-reopen-requests?${params.toString()}`);
+    const response = await apiClient.get(`/grade-appeals?${params.toString()}`);
     return response.data.data;
   },
 
-  approveGradingReopenRequest: async (id: string, reviewNote?: string): Promise<any> => {
-    const response = await apiClient.patch(`/academic/grading-reopen-requests/${id}/approve`, { reviewNote });
+  approveGradeAppeal: async (id: string, reviewNote?: string): Promise<any> => {
+    const response = await apiClient.patch(`/grade-appeals/${id}/approve`, { reviewNote });
     return response.data;
   },
 
-  rejectGradingReopenRequest: async (id: string, reviewNote: string): Promise<any> => {
-    const response = await apiClient.patch(`/academic/grading-reopen-requests/${id}/reject`, { reviewNote });
+  rejectGradeAppeal: async (id: string, reviewNote: string): Promise<any> => {
+    const response = await apiClient.patch(`/grade-appeals/${id}/reject`, { reviewNote });
+    return response.data;
+  },
+
+  // PĐT chủ động tạo yêu cầu phúc khảo cho bài nộp (thay cho "trả về chấm lại").
+  createAppealByAcademic: async (submissionId: string, reason: string): Promise<any> => {
+    const response = await apiClient.post(`/grade-appeals/academic/${submissionId}`, { reason });
     return response.data;
   },
 
@@ -233,33 +237,6 @@ export const academicService = {
     changedBy: { id: string; fullName: string; email: string; role: string };
   }>> => {
     const response = await apiClient.get(`/academic/classes/${classId}/assignment-history`);
-    return response.data.data;
-  },
-
-  // ==========================================
-  // PHÊ DUYỆT ĐIỂM SỐ (GRADE APPROVALS - UC-16)
-  // ==========================================
-  approveGrade: async (submissionId: string, data: { isApproved: boolean; version: number; reason?: string }): Promise<any> => {
-    const response = await apiClient.put(`/system/grades/${submissionId}/approve`, data);
-    return response.data.data;
-  },
-
-  // UC-16 (BATCH): phê duyệt / trả về theo lô — flip cả Grade.isApproved và submission.status (HOAN_THANH / DANG_CHAM).
-  batchApproveGrades: async (data: {
-    submissionIds: string[];
-    action: 'APPROVE' | 'RETURN';
-    reason?: string;
-  }): Promise<{
-    action: 'APPROVE' | 'RETURN';
-    totalRequested: number;
-    successCount: number;
-    failedCount: number;
-    results: Array<
-      | { submissionId: string; status: 'SUCCESS' }
-      | { submissionId: string; status: 'FAILED'; reason: string }
-    >;
-  }> => {
-    const response = await apiClient.post('/system/grades/batch-approve', data);
     return response.data.data;
   },
 

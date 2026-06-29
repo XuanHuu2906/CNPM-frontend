@@ -38,7 +38,6 @@ import AcademicAssignment from './pages/academic/AcademicAssignment';
 import AcademicTerms from './pages/academic/AcademicTerms';
 import AcademicClassImport from './pages/academic/AcademicClassImport';
 import AcademicStudentImport from './pages/academic/AcademicStudentImport';
-import GradingReopenRequests from './pages/academic/GradingReopenRequests';
 
 // Admin Layout & Pages
 import AdminLayout from './layouts/AdminLayout';
@@ -122,7 +121,6 @@ function App() {
                                     <Route path="terms" element={<AcademicTerms />} />
                                     <Route path="class-import" element={<AcademicClassImport />} />
                                     <Route path="student-import" element={<AcademicStudentImport />} />
-                                    <Route path="reopen-requests" element={<GradingReopenRequests />} />
                                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                                 </Route>
 
