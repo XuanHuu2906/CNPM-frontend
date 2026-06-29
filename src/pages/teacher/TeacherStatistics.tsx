@@ -83,7 +83,7 @@ export default function TeacherStatistics() {
   
   const gradedSubmissions = submissions.filter((s: any) => {
     const hasScore = s.grades && s.grades.length > 0;
-    return hasScore && (s.status === 'DA_CHAM' || s.status === 'HOAN_THANH');
+    return hasScore && s.status === 'DA_CHAM';
   });
 
   const gradedGroups = gradedSubmissions.length;

@@ -46,7 +46,7 @@ interface ProgressStudent {
   lecturer: string;
   date: string;
   version: string;
-  status: 'CHUA_NOP' | 'DA_NOP' | 'DANG_CHAM' | 'YEU_CAU_SUA' | 'DA_CHAM' | 'CHO_DUYET' | 'HOAN_THANH' | 'TU_CHOI';
+  status: 'CHUA_NOP' | 'DA_NOP' | 'DANG_CHAM' | 'YEU_CAU_SUA' | 'DA_CHAM' | 'TU_CHOI';
   score: number | null;
 }
 
@@ -172,9 +172,9 @@ export default function AcademicDashboard() {
 
   // Tự động tính toán lại KPI động dựa trên bộ lọc
   const totalCount = filteredStudents.length;
-  const completedCount = filteredStudents.filter(s => s.status === 'HOAN_THANH').length;
-  const pendingApprovalCount = filteredStudents.filter(s => s.status === 'CHO_DUYET').length;
-  const gradingCount = filteredStudents.filter(s => s.status === 'DANG_CHAM' || s.status === 'DA_CHAM').length;
+  const completedCount = filteredStudents.filter(s => s.status === 'DA_CHAM').length;
+  const pendingApprovalCount = 0;
+  const gradingCount = filteredStudents.filter(s => s.status === 'DANG_CHAM').length;
 
   const dynamicStats = [
     {
@@ -210,19 +210,18 @@ export default function AcademicDashboard() {
   // 3. Dữ liệu Phân bộ Trạng thái Báo cáo (PieChart)
   const statusData = [
     { name: 'Đã nộp', value: studentsProgress.filter(s => s.status === 'DA_NOP').length, color: '#6366f1' },
-    { name: 'Đang chấm', value: studentsProgress.filter(s => s.status === 'DANG_CHAM' || s.status === 'DA_CHAM').length, color: '#3b82f6' },
-    { name: 'Chờ duyệt', value: studentsProgress.filter(s => s.status === 'CHO_DUYET').length, color: '#eab308' },
-    { name: 'Hoàn thành', value: studentsProgress.filter(s => s.status === 'HOAN_THANH').length, color: '#10b981' },
+    { name: 'Đang chấm', value: studentsProgress.filter(s => s.status === 'DANG_CHAM').length, color: '#3b82f6' },
+    { name: 'Đã chấm', value: studentsProgress.filter(s => s.status === 'DA_CHAM').length, color: '#10b981' },
     { name: 'Từ chối / Khác', value: studentsProgress.filter(s => s.status === 'TU_CHOI' || s.status === 'YEU_CAU_SUA').length, color: '#f43f5e' }
   ];
 
   // 4. Dữ liệu Thống kê theo Bộ môn (BarChart)
   const deptData = [
-    { name: 'CNPM', 'Đã chấm': studentsProgress.filter(s => s.dept === 'CNPM' && s.status === 'HOAN_THANH').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'CNPM').length },
-    { name: 'HTTT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'HTTT' && s.status === 'HOAN_THANH').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'HTTT').length },
-    { name: 'KHMT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'KHMT' && s.status === 'HOAN_THANH').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'KHMT').length },
-    { name: 'KTMT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'KTMT' && s.status === 'HOAN_THANH').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'KTMT').length },
-    { name: 'MMT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'MMT' && s.status === 'HOAN_THANH').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'MMT').length }
+    { name: 'CNPM', 'Đã chấm': studentsProgress.filter(s => s.dept === 'CNPM' && s.status === 'DA_CHAM').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'CNPM').length },
+    { name: 'HTTT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'HTTT' && s.status === 'DA_CHAM').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'HTTT').length },
+    { name: 'KHMT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'KHMT' && s.status === 'DA_CHAM').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'KHMT').length },
+    { name: 'KTMT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'KTMT' && s.status === 'DA_CHAM').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'KTMT').length },
+    { name: 'MMT', 'Đã chấm': studentsProgress.filter(s => s.dept === 'MMT' && s.status === 'DA_CHAM').length, 'Tổng số': studentsProgress.filter(s => s.dept === 'MMT').length }
   ];
 
   // 5. Danh sách Cảnh báo Khẩn cấp
@@ -290,10 +289,6 @@ export default function AcademicDashboard() {
       case 'YEU_CAU_SUA':
         return 'bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900';
       case 'DA_CHAM':
-        return 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900';
-      case 'CHO_DUYET':
-        return 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900';
-      case 'HOAN_THANH':
         return 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900';
       case 'TU_CHOI':
         return 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900';
@@ -310,8 +305,6 @@ export default function AcademicDashboard() {
       case 'DANG_CHAM': return 'Đang chấm';
       case 'YEU_CAU_SUA': return 'Yêu cầu sửa';
       case 'DA_CHAM': return 'Đã chấm';
-      case 'CHO_DUYET': return 'Chờ duyệt';
-      case 'HOAN_THANH': return 'Hoàn thành';
       case 'TU_CHOI': return 'Từ chối';
       default: return status;
     }
@@ -620,7 +613,7 @@ export default function AcademicDashboard() {
 
           {/* STATUS TABS */}
           <div className="flex flex-wrap gap-1.5 mb-6">
-            {(['all', 'CHUA_NOP', 'DA_NOP', 'DANG_CHAM', 'YEU_CAU_SUA', 'CHO_DUYET', 'HOAN_THANH', 'TU_CHOI'] as const).map((tab) => (
+            {(['all', 'CHUA_NOP', 'DA_NOP', 'DANG_CHAM', 'YEU_CAU_SUA', 'DA_CHAM', 'TU_CHOI'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSelectedStatusTab(tab)}

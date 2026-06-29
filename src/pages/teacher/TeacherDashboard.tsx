@@ -25,6 +25,7 @@ export default function TeacherDashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [totalGroups, setTotalGroups] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fetchingSubmissions, setFetchingSubmissions] = useState(false);
 
@@ -33,29 +34,6 @@ export default function TeacherDashboard() {
 
   // Modal State cho Xem chi tiết
   const [selectedGroupDetails, setSelectedGroupDetails] = useState<any>(null);
-
-  // UC-16 (BATCH): trạng thái gửi duyệt cả lớp.
-  const [submittingClass, setSubmittingClass] = useState(false);
-  const handleSubmitClassForReview = async () => {
-    if (!selectedClass) return;
-    const ready = submissions.filter(s => s.status === 'DA_CHAM');
-    if (ready.length === 0) return;
-    const ok = window.confirm(`Gửi ${ready.length} bài đã chấm xong của lớp sang Phòng Đào tạo duyệt?`);
-    if (!ok) return;
-    try {
-      setSubmittingClass(true);
-      const res = await teacherService.submitClassForReview(selectedClass);
-      const skippedNote = res.skippedCount > 0 ? ` (bỏ qua ${res.skippedCount})` : '';
-      toast.success(`Đã gửi ${res.movedCount} bài sang Chờ duyệt${skippedNote}.`);
-      const data = await teacherService.getClassSubmissions(selectedClass);
-      setSubmissions(data);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err.message;
-      toast.error(`Không gửi duyệt được: ${msg}`);
-    } finally {
-      setSubmittingClass(false);
-    }
-  };
 
   // Lấy danh sách lớp phân công từ profile giáo viên khi mount
   useEffect(() => {
@@ -94,8 +72,12 @@ export default function TeacherDashboard() {
     const fetchSubmissions = async () => {
       try {
         setFetchingSubmissions(true);
-        const data = await teacherService.getClassSubmissions(selectedClass);
-        setSubmissions(data);
+        const [subs, groups] = await Promise.all([
+          teacherService.getClassSubmissions(selectedClass),
+          teacherService.getGroupsByClassId(selectedClass).catch(() => []),
+        ]);
+        setSubmissions(subs);
+        setTotalGroups(Array.isArray(groups) ? groups.length : 0);
       } catch (err) {
         toast.error("Không thể tải danh sách bài nộp của lớp này.");
       } finally {
@@ -127,7 +109,8 @@ export default function TeacherDashboard() {
       members = [`${sub.student?.user?.fullName || 'Chưa có tên'} (MSSV: ${sub.student?.studentCode || sub.student?.user?.student?.studentCode || 'N/A'})`];
     }
 
-    const score = sub.grades && sub.grades.length > 0 ? Number(sub.grades[0].finalScore) : null;
+    const grade = sub.grades && sub.grades.length > 0 ? sub.grades[0] : null;
+    const score = grade ? Number(grade.finalScore) : null;
 
     return {
       id: sub.id,
@@ -156,7 +139,7 @@ export default function TeacherDashboard() {
 
     mappedGroups.forEach(g => {
       const membersStr = g.members.join("; ");
-      const showScore = ['DANG_CHAM', 'DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(g.status);
+      const showScore = ['DANG_CHAM', 'DA_CHAM'].includes(g.status);
       const scoreStr = (showScore && g.score !== null) ? g.score.toFixed(1) : "--";
       csvContent += `"${g.id}","${g.groupName}","${g.topic}","${membersStr}","${g.submissionDate}","${g.status}","${scoreStr}"\n`;
     });
@@ -186,7 +169,7 @@ export default function TeacherDashboard() {
     if (status === 'DA_NOP') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">Chưa chấm</span>;
     if (status === 'DANG_CHAM') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"><Sparkles className="w-3 h-3" /> Đang chấm</span>;
 
-    // DA_CHAM, CHO_DUYET, HOAN_THANH
+    // DA_CHAM (terminal)
     return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900"><CheckCircle2 className="w-3 h-3" /> Đã chấm</span>;
   };
 
@@ -255,57 +238,34 @@ export default function TeacherDashboard() {
       )}
 
       {/* QUICK STATS CARDS */}
-      {submissions.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
-            <span className="text-3xl font-black text-slate-700 dark:text-slate-200">{submissions.length}</span>
-            <span className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">Tổng nhóm</span>
-          </div>
-          <div className="bg-sky-50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
-            <span className="text-3xl font-black text-sky-600 dark:text-sky-400">
-              {submissions.filter(s => ['DA_NOP', 'DANG_CHAM', 'DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(s.status)).length}
-            </span>
-            <span className="text-xs font-semibold text-sky-600/70 dark:text-sky-400/70 mt-1 uppercase tracking-wider">Đã nộp</span>
-          </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
-            <span className="text-3xl font-black text-slate-600 dark:text-slate-300">
-              {submissions.filter(s => ['CHUA_NOP', 'YEU_CAU_SUA'].includes(s.status)).length}
-            </span>
-            <span className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">Chưa nộp</span>
-          </div>
-          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
-            <span className="text-3xl font-black text-amber-600 dark:text-amber-400">
-              {submissions.filter(s => s.status === 'DANG_CHAM').length}
-            </span>
-            <span className="text-xs font-semibold text-amber-600/70 dark:text-amber-400/70 mt-1 uppercase tracking-wider">Đang chấm</span>
-          </div>
-          <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
-            <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
-              {submissions.filter(s => s.status === 'HOAN_THANH').length}
-            </span>
-            <span className="text-xs font-semibold text-emerald-600/70 dark:text-emerald-400/70 mt-1 uppercase tracking-wider">Hoàn thành</span>
-          </div>
-        </div>
-      )}
-
-      {/* UC-16 (BATCH): GV gửi duyệt cả lớp — chỉ enable khi có >=1 bài DA_CHAM. */}
       {submissions.length > 0 && (() => {
-        const ready = submissions.filter(s => s.status === 'DA_CHAM');
+        const totalUnits = Math.max(totalGroups, submissions.length);
+        const submittedCount = submissions.filter(s => ['DA_NOP', 'DANG_CHAM', 'DA_CHAM'].includes(s.status)).length;
+        const notSubmittedCount = Math.max(0, totalUnits - submittedCount);
+        const gradingCount = submissions.filter(s => s.status === 'DANG_CHAM').length;
+        const gradedCount = submissions.filter(s => s.status === 'DA_CHAM').length;
         return (
-          <div className="bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="text-left">
-              <h4 className="text-sm font-extrabold text-indigo-700 dark:text-indigo-300">Gửi cả lớp lên Phòng Đào tạo duyệt</h4>
-              <p className="text-[11px] font-semibold text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
-                Khi đã chấm xong các bài đủ điều kiện, gửi tất cả {ready.length} bài Đã chấm sang Chờ duyệt trong 1 thao tác.
-              </p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
+              <span className="text-3xl font-black text-slate-700 dark:text-slate-200">{totalUnits}</span>
+              <span className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">Tổng nhóm</span>
             </div>
-            <button
-              disabled={ready.length === 0 || submittingClass}
-              onClick={handleSubmitClassForReview}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/15 cursor-pointer transition-all shrink-0"
-            >
-              {submittingClass ? 'Đang gửi…' : `Gửi duyệt ${ready.length} bài`}
-            </button>
+            <div className="bg-sky-50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
+              <span className="text-3xl font-black text-sky-600 dark:text-sky-400">{submittedCount}</span>
+              <span className="text-xs font-semibold text-sky-600/70 dark:text-sky-400/70 mt-1 uppercase tracking-wider">Đã nộp</span>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
+              <span className="text-3xl font-black text-slate-600 dark:text-slate-300">{notSubmittedCount}</span>
+              <span className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">Chưa nộp</span>
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
+              <span className="text-3xl font-black text-amber-600 dark:text-amber-400">{gradingCount}</span>
+              <span className="text-xs font-semibold text-amber-600/70 dark:text-amber-400/70 mt-1 uppercase tracking-wider">Đang chấm</span>
+            </div>
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
+              <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{gradedCount}</span>
+              <span className="text-xs font-semibold text-emerald-600/70 dark:text-emerald-400/70 mt-1 uppercase tracking-wider">Đã chấm</span>
+            </div>
           </div>
         );
       })()}
@@ -338,9 +298,7 @@ export default function TeacherDashboard() {
             <option value="DANG_CHAM">Đang chấm</option>
             <option value="YEU_CAU_SUA">Yêu cầu sửa</option>
             <option value="DA_CHAM">Đã chấm</option>
-            <option value="CHO_DUYET">Chờ duyệt</option>
             <option value="TU_CHOI">Từ chối</option>
-            <option value="HOAN_THANH">Hoàn thành</option>
           </select>
         </div>
       </div>
@@ -404,7 +362,7 @@ export default function TeacherDashboard() {
                           {getGradingStatusBadge(group.status)}
                         </td>
                         <td className="py-5 px-6">
-                          {['DANG_CHAM', 'DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(group.status) && group.score !== null ? (
+                          {['DANG_CHAM', 'DA_CHAM'].includes(group.status) && group.score !== null ? (
                             <span className="text-base font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 px-2.5 py-1 rounded-xl shadow-sm">
                               {group.score.toFixed(1)}
                             </span>
@@ -491,7 +449,7 @@ export default function TeacherDashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Điểm tổng quan</p>
-                    <p className="font-black text-indigo-600 dark:text-indigo-400 text-base">{['DANG_CHAM', 'DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(selectedGroupDetails.status) && selectedGroupDetails.score !== null ? selectedGroupDetails.score.toFixed(1) : '--'}</p>
+                    <p className="font-black text-indigo-600 dark:text-indigo-400 text-base">{['DANG_CHAM', 'DA_CHAM'].includes(selectedGroupDetails.status) && selectedGroupDetails.score !== null ? selectedGroupDetails.score.toFixed(1) : '--'}</p>
                   </div>
                 </div>
               </div>

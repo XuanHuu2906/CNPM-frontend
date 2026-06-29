@@ -88,12 +88,6 @@ export default function GradingWorkshop() {
   // UC-15 / B13: phân loại vi phạm gửi kèm khi từ chối — BE lưu vào field riêng violationType.
   const [violationType, setViolationType] = useState<string>('DAO_VAN');
 
-  // States cho Yêu cầu mở lại chấm điểm
-  const [showReopenModal, setShowReopenModal] = useState(false);
-  const [reopenReason, setReopenReason] = useState('');
-  const [reopenLoading, setReopenLoading] = useState(false);
-  const [hasSentReopenRequest, setHasSentReopenRequest] = useState(false);
-
   // States cho Xác nhận nộp điểm
   const [showConfirmSubmitModal, setShowConfirmSubmitModal] = useState(false);
   const [confirmSubmitChecked, setConfirmSubmitChecked] = useState(false);
@@ -455,28 +449,6 @@ export default function GradingWorkshop() {
 
 
 
-  // Gửi yêu cầu mở lại chấm điểm
-  const handleSendReopenRequest = async () => {
-    if (reopenReason.trim().length < 10) {
-      toast.error('Lý do phải có ít nhất 10 ký tự!');
-      return;
-    }
-    try {
-      setReopenLoading(true);
-      await teacherService.createReopenRequest(submissionId, reopenReason);
-      toast.success('Đã gửi yêu cầu mở lại chấm điểm tới Phòng Đào tạo.');
-      setShowReopenModal(false);
-      setReopenReason('');
-      setHasSentReopenRequest(true);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu.');
-    } finally {
-      setReopenLoading(false);
-    }
-  };
-
-
-
   const getFileUrl = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
@@ -500,11 +472,9 @@ export default function GradingWorkshop() {
 
   // YEU_CAU_SUA / TU_CHOI cũng readonly: GV đã yêu cầu SV sửa hoặc bài đã loại
   // → không cho thao tác chấm để tránh ghi đè dữ liệu khi SV nộp lại.
-  // Bổ sung: nếu Grade.isApproved=true (PĐT đã duyệt) mà submission.status chưa kịp
-  // cascade sang HOAN_THANH thì vẫn phải khoá để tránh GV sửa điểm đã duyệt.
+  // DA_CHAM là terminal: GV muốn sửa phải xin mở lại chấm điểm.
   const isReadOnly: boolean = stateData?.readOnly === true ||
-    Boolean(existingGrade?.isApproved) ||
-    Boolean(submission && ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH', 'YEU_CAU_SUA', 'TU_CHOI'].includes(submission.status));
+    Boolean(submission && ['DA_CHAM', 'YEU_CAU_SUA', 'TU_CHOI'].includes(submission.status));
 
   if (!stateData) {
     return <GradingList />;
@@ -605,37 +575,43 @@ export default function GradingWorkshop() {
                   <p className="text-slate-400 italic font-normal">Không có tệp đính kèm phụ.</p>
                 )}
 
-                {(submission?.repoLink || submission?.videoLink) && (
-                  <>
-                    <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-4">Liên kết ngoài:</h3>
-                    <div className="grid grid-cols-1 gap-2 mt-2">
-                      {submission?.repoLink && (
-                        <a
-                          href={submission.repoLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-lg text-indigo-600 dark:text-indigo-400 hover:underline"
-                        >
-                          <BookOpen className="w-4 h-4 shrink-0 text-slate-400" />
-                          <span className="truncate flex-1 font-semibold">Source code: {submission.repoLink}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      {submission?.videoLink && (
-                        <a
-                          href={submission.videoLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-lg text-rose-600 dark:text-rose-400 hover:underline"
-                        >
-                          <BookOpen className="w-4 h-4 shrink-0 text-slate-400" />
-                          <span className="truncate flex-1 font-semibold">Video demo: {submission.videoLink}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
+                <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-4">Liên kết ngoài:</h3>
+                <div className="grid grid-cols-1 gap-2 mt-2">
+                  {submission?.repoLink ? (
+                    <a
+                      href={submission.repoLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-lg text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      <BookOpen className="w-4 h-4 shrink-0 text-slate-400" />
+                      <span className="truncate flex-1 font-semibold">Source code: {submission.repoLink}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2 bg-slate-50/50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 dark:text-slate-500">
+                      <BookOpen className="w-4 h-4 shrink-0" />
+                      <span className="truncate flex-1 font-medium italic">Source code: Sinh viên chưa cung cấp</span>
                     </div>
-                  </>
-                )}
+                  )}
+                  {submission?.videoLink ? (
+                    <a
+                      href={submission.videoLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-150 dark:border-slate-750 rounded-lg text-rose-600 dark:text-rose-400 hover:underline"
+                    >
+                      <BookOpen className="w-4 h-4 shrink-0 text-slate-400" />
+                      <span className="truncate flex-1 font-semibold">Video demo: {submission.videoLink}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2 bg-slate-50/50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 dark:text-slate-500">
+                      <BookOpen className="w-4 h-4 shrink-0" />
+                      <span className="truncate flex-1 font-medium italic">Video demo: Sinh viên chưa cung cấp</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end items-center">
@@ -786,7 +762,7 @@ export default function GradingWorkshop() {
               </div>
 
               {/* UC-09 / UC-I05 EXT: Hệ số đóng góp từng thành viên — chỉ hiện cho bài nhóm
-                    và sau khi đã có Grade. Đóng băng nếu submission chuyển sang CHO_DUYET/HOAN_THANH. */}
+                    và sau khi đã có Grade. Đóng băng nếu submission chuyển sang DA_CHAM. */}
               {memberScores && memberScores.length > 0 && (
                 <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2">
@@ -1002,27 +978,6 @@ export default function GradingWorkshop() {
                 <Lock className="w-4 h-4" />
                 Bài nộp ở chế độ chỉ đọc. Không thể chỉnh sửa điểm số.
               </div>
-              {['DA_CHAM', 'CHO_DUYET'].includes(submission?.status || '') && (
-                (() => {
-                  // Check if there is an existing pending request from the backend or newly sent
-                  const isPending = hasSentReopenRequest || submission?.reopenRequests?.some((req: any) => req.status === 'PENDING');
-                  if (isPending) {
-                    return (
-                      <span className="px-4 py-2 border border-emerald-200 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold dark:bg-emerald-950/20 dark:border-emerald-900/50">
-                        Đã gửi yêu cầu
-                      </span>
-                    );
-                  }
-                  return (
-                    <button
-                      onClick={() => setShowReopenModal(true)}
-                      className="px-4 py-2 border border-amber-200 bg-amber-50 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 dark:bg-amber-950/20 dark:border-amber-900/50 dark:hover:bg-amber-900/30"
-                    >
-                      Yêu cầu mở lại chấm điểm
-                    </button>
-                  );
-                })()
-              )}
             </div>
           )}
         </div>
@@ -1166,50 +1121,6 @@ export default function GradingWorkshop() {
               >
                 {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Xác nhận nộp điểm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* REOPEN REQUEST MODAL */}
-      {showReopenModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-200 text-left">
-            <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              Yêu cầu mở lại chấm điểm
-            </h3>
-            <p className="text-xs text-slate-500 font-semibold">
-              Gửi yêu cầu tới Phòng Đào tạo để xin phép mở lại quyền chấm điểm cho báo cáo này.
-              Vui lòng nêu rõ lý do (nhập sai điểm, chấm nhầm, v.v.).
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Lý do yêu cầu (tối thiểu 10 ký tự)</label>
-              <textarea
-                rows={4}
-                value={reopenReason}
-                onChange={(e) => setReopenReason(e.target.value)}
-                placeholder="Tôi lỡ tay nhập nhầm điểm ở tiêu chí số 2..."
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-semibold"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setShowReopenModal(false)}
-                className="px-4 py-2 text-xs font-bold border rounded-xl"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSendReopenRequest}
-                disabled={reopenLoading || reopenReason.trim().length < 10}
-                className="px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-md flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {reopenLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Gửi yêu cầu
               </button>
             </div>
           </div>

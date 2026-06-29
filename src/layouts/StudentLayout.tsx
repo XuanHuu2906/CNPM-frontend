@@ -161,7 +161,7 @@ export default function StudentLayout() {
       icon: FileUp
     },
     {
-      title: 'Tiến độ chấm',
+      title: 'Kết quả Đánh giá',
       path: '/student/evaluation',
       icon: Clock
     }
@@ -480,7 +480,7 @@ export default function StudentLayout() {
                               </p>
                             </div>
                             <span className={`px-2.5 py-1 text-[11px] font-extrabold rounded-full self-start md:self-auto border ${
-                              sub.status === 'DA_CHAM' || sub.status === 'HOAN_THANH'
+                              sub.status === 'DA_CHAM'
                                 ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-700'
                                 : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-700'
                             }`}>

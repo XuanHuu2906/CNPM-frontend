@@ -77,4 +77,15 @@ export const studentService = {
     const response = await apiClient.post('/auth/change-password', { oldPassword, newPassword });
     return response.data.data;
   },
+
+  // UC-25: Phúc khảo điểm.
+  createGradeAppeal: async (submissionId: string, reason: string) => {
+    const response = await apiClient.post(`/grade-appeals/${submissionId}`, { reason });
+    return response.data.data;
+  },
+
+  getMyGradeAppeals: async () => {
+    const response = await apiClient.get('/grade-appeals/my');
+    return response.data.data;
+  },
 };

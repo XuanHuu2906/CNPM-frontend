@@ -100,16 +100,11 @@ export default function GradingList() {
     const grade = sub.grades && sub.grades.length > 0 ? sub.grades[0] : null;
     const score = grade ? Number(grade.finalScore) : null;
 
-    // Khi PĐT đã phê duyệt (grade.isApproved=true) nhưng submission.status chưa kịp cascade
-    // sang HOAN_THANH (bug lịch sử / drift), vẫn hiển thị là "Hoàn thành" để khớp với
-    // bảng phê duyệt của PĐT thay vì giữ "Đang chấm" / "Đã chấm" cũ.
-    const effectiveStatus = grade?.isApproved ? 'HOAN_THANH' : sub.status;
-
     return {
       id: sub.id,
       groupName: name,
       topic: topic || 'Chưa đăng ký đề tài',
-      status: effectiveStatus,
+      status: sub.status,
       submissionDate: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('vi-VN') : '',
       score,
       version: sub.version,
@@ -123,8 +118,6 @@ export default function GradingList() {
     if (status === 'TU_CHOI') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900"><XCircle className="w-3 h-3" /> Từ chối</span>;
     if (status === 'DANG_CHAM') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"><Sparkles className="w-3 h-3" /> Đang chấm</span>;
     if (status === 'DA_CHAM') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900"><CheckCircle2 className="w-3 h-3" /> Đã chấm</span>;
-    if (status === 'CHO_DUYET') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"><Clock className="w-3 h-3" /> Chờ duyệt</span>;
-    if (status === 'HOAN_THANH') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"><CheckCircle2 className="w-3 h-3" /> Hoàn thành</span>;
 
     return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-600 border border-sky-100 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900"><CheckCircle2 className="w-3 h-3 animate-pulse" /> Đã nộp</span>;
   };
@@ -217,7 +210,6 @@ export default function GradingList() {
             <option value="DANG_CHAM">Đang chấm</option>
             <option value="DA_CHAM">Đã chấm</option>
             <option value="YEU_CAU_SUA">Yêu cầu sửa</option>
-            <option value="HOAN_THANH">Hoàn thành</option>
           </select>
         </div>
       </div>
@@ -250,7 +242,7 @@ export default function GradingList() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {filteredGroups.length > 0 ? (
                     filteredGroups.map((group) => {
-                      const isComplete = ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(group.status);
+                      const isComplete = group.status === 'DA_CHAM';
                       const isDraft = group.status === 'DANG_CHAM';
                       const isUnsubmitted = group.status === 'CHUA_NOP';
                       // Đang yêu cầu sửa / từ chối → không cho chấm (chờ SV nộp lại hoặc bài đã loại).
@@ -287,7 +279,7 @@ export default function GradingList() {
                             <span className="inline-block whitespace-nowrap">{getSubmitStatusBadge(group.status)}</span>
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            {['DANG_CHAM', 'DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(group.status) ? (
+                            {['DANG_CHAM', 'DA_CHAM'].includes(group.status) ? (
                               <span className="inline-block text-sm font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 px-2 py-0.5 rounded-lg shadow-sm whitespace-nowrap">
                                 {group.score !== null ? group.score.toFixed(1) : '--'}
                               </span>
@@ -328,15 +320,31 @@ export default function GradingList() {
 
                             {!isUnsubmitted && hasRubrics && !isWaitingForFix && !isRejected && (
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   const selectedClassObj = classes.find(c => c.id === selectedClass);
+                                  let nextVersion = group.version;
+                                  // Lần đầu mở phòng chấm (DA_NOP) → flip sang DANG_CHAM để timeline
+                                  // SV cập nhật ngay, đồng thời bump OCC version trả về.
+                                  if (group.status === 'DA_NOP') {
+                                    try {
+                                      const updated = await teacherService.updateSubmissionStatus(group.id, {
+                                        status: 'DANG_CHAM',
+                                        note: 'Giảng viên bắt đầu chấm bài.',
+                                        version: group.version,
+                                      });
+                                      nextVersion = updated?.version ?? group.version;
+                                    } catch (err: any) {
+                                      toast.error(err?.response?.data?.message || 'Không thể chuyển trạng thái sang Đang chấm.');
+                                      return;
+                                    }
+                                  }
                                   navigate('/teacher/grading', {
                                     state: {
                                       submissionId: group.id,
                                       groupName: group.groupName,
                                       topic: group.topic,
                                       members: group.members,
-                                      version: group.version,
+                                      version: nextVersion,
                                       classId: selectedClass,
                                       classCode: selectedClassObj?.code,
                                       readOnly: isComplete

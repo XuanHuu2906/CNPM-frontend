@@ -1,23 +1,16 @@
 import { useState, useEffect } from 'react';
-import { 
-  FileCheck2, 
-  User, 
-  GraduationCap, 
-  BarChart3, 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
+import {
+  FileCheck2,
+  AlertTriangle,
   Send,
   MessageSquare,
-  Sparkles,
   BookOpen,
-  PieChart as PieIcon,
   ChevronRight,
   ChevronLeft,
-  Download,
   Ban,
   ExternalLink,
-  Info
+  Info,
+  CheckCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -30,7 +23,7 @@ interface TopicReport {
   members: string[];
   score: number | null;
   comments: string;
-  status: 'CHO_DUYET' | 'HOAN_THANH' | 'DANG_CHAM';
+  status: 'DA_CHAM' | 'DANG_CHAM';
   rubricBreakdown: { name: string; weight: number; score: number | null; comment: string }[];
   version: number;
   fileUrl: string;
@@ -68,14 +61,14 @@ export default function AcademicApprovals() {
   const [reportPage, setReportPage] = useState(1);
   const reportsPerPage = 3; 
 
-  // Modal từ chối phê duyệt (Reject)
+  // Modal yêu cầu phúc khảo
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [targetRejectReportId, setTargetRejectReportId] = useState<string | null>(null);
 
-  // UC-16 (BATCH): tích chọn nhiều bài để duyệt / trả về theo lô.
+  // Tích chọn nhiều bài để yêu cầu phúc khảo theo lô.
   const [selectedReportIds, setSelectedReportIds] = useState<Set<string>>(new Set());
-  const [bulkAction, setBulkAction] = useState<'APPROVE' | 'RETURN' | null>(null);
+  const [bulkAction, setBulkAction] = useState<'APPEAL' | null>(null);
   const [bulkReason, setBulkReason] = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkLastResults, setBulkLastResults] = useState<Array<
@@ -120,19 +113,8 @@ export default function AcademicApprovals() {
             : [sub.student?.user?.fullName || 'N/A'];
 
           const grade = sub.grades && sub.grades.length > 0 ? sub.grades[0] : null;
-          const isApproved = grade?.isApproved || false;
-          // Map status dựa trên submission.status thật (không dựa vào "có grade").
-          // Lý do: GV "Lưu nháp" tạo Grade record nhưng submission vẫn DA_NOP → trước đây sẽ bị
-          // hiển thị nhầm thành CHO_DUYET → PĐT thấy nút phê duyệt cho bản nháp (bug critical).
-          let status: 'DANG_CHAM' | 'CHO_DUYET' | 'HOAN_THANH';
-          if (isApproved) {
-            status = 'HOAN_THANH';
-          } else if (sub.status === 'CHO_DUYET') {
-            status = 'CHO_DUYET';
-          } else {
-            // DA_NOP / DA_CHAM (nháp) / DANG_CHAM / YEU_CAU_SUA / TU_CHOI / CHUA_NOP → đều coi là chưa sẵn sàng duyệt.
-            status = 'DANG_CHAM';
-          }
+          // DA_CHAM là terminal: bài đã chấm xong. Còn lại coi như đang chấm.
+          const status: 'DANG_CHAM' | 'DA_CHAM' = sub.status === 'DA_CHAM' ? 'DA_CHAM' : 'DANG_CHAM';
 
           // Đọc phân rã Rubric từ detailedScores
           const rubricBreakdown = grade?.rubric?.criteria?.map((crit: any) => {
@@ -212,10 +194,6 @@ export default function AcademicApprovals() {
 
   const currentClass = pendingClasses.find(c => c.id === selectedClassId) || pendingClasses[0];
 
-  const isBatchApproveEnabled = currentClass && currentClass.reports.length > 0 && 
-    currentClass.reports.some(r => r.status === 'CHO_DUYET') &&
-    currentClass.reports.every(r => r.status === 'HOAN_THANH' || (r.status === 'CHO_DUYET' && r.score !== null && r.comments && r.rubricBreakdown && r.rubricBreakdown.length > 0 && r.rubricBreakdown.every(b => b.score !== null)));
-
   const totalClassPages = Math.ceil(pendingClasses.length / classesPerPage);
   const paginatedClasses = pendingClasses.slice(
     (classPage - 1) * classesPerPage,
@@ -234,50 +212,23 @@ export default function AcademicApprovals() {
     setSelectedReportId(null);
   }, [selectedClassId]);
 
-  const currentReport = 
-    currentClass?.reports.find(r => r.id === selectedReportId) || 
-    paginatedReports[0] || 
+  const currentReport =
+    currentClass?.reports.find(r => r.id === selectedReportId) ||
+    paginatedReports[0] ||
     currentClass?.reports[0];
 
-  // Xử lý Phê duyệt một Đề tài riêng lẻ
-  const handleApproveReport = async (reportId: string) => {
-    if (!currentClass) return;
-    const report = currentClass.reports.find(r => r.id === reportId);
-    if (!report) return;
-
-    if (report.score === null) {
-      toast.error(
-        <div className="text-left font-semibold">
-          <p className="text-red-600 dark:text-red-400 font-extrabold flex items-center gap-1">🚨 Không thể phê duyệt!</p>
-          <p className="text-xs text-slate-500 mt-1">Bài nộp của {report.groupName} chưa được giảng viên chấm điểm thành phần.</p>
-        </div>
-      );
-      return;
-    }
-
-    try {
-      toast.loading('Đang tiến hành phê duyệt kết quả điểm...', { id: 'approve-action' });
-      await academicService.approveGrade(reportId, { isApproved: true, version: report.version });
-      toast.success(`Đã phê duyệt kết quả đề tài "${report.topicName}" thành công!`, { id: 'approve-action' });
-      
-      loadData();
-    } catch (error: any) {
-      toast.error(`Phê duyệt thất bại: ${error.message}`, { id: 'approve-action' });
-    }
-  };
-
-  // Mở modal từ chối
+  // Mở modal yêu cầu phúc khảo
   const handleOpenRejectModal = (reportId: string | null) => {
     setTargetRejectReportId(reportId);
     setRejectReason('');
     setShowRejectModal(true);
   };
 
-  // Xác nhận từ chối chấm lại (Hủy phê duyệt để GV chấm lại)
-  const handleSendReject = async () => {
+  // Gửi yêu cầu phúc khảo cho một bài (PĐT chủ động tạo đơn).
+  const handleSendAppeal = async () => {
     if (!currentClass) return;
-    if (!rejectReason.trim()) {
-      toast.error('Vui lòng cung cấp lý do cụ thể để giảng viên cập nhật lại!');
+    if (rejectReason.trim().length < 20) {
+      toast.error('Lý do yêu cầu phúc khảo phải có ít nhất 20 ký tự!');
       return;
     }
 
@@ -286,80 +237,59 @@ export default function AcademicApprovals() {
       if (!report) return;
 
       try {
-        toast.loading('Đang gửi yêu cầu trả về chấm lại...', { id: 'reject-action' });
-        // Gỡ duyệt điểm + đồng bộ status về DANG_CHAM kèm lý do để GV cập nhật lại.
-        await academicService.approveGrade(targetRejectReportId, {
-          isApproved: false,
-          version: report.version,
-          reason: rejectReason.trim(),
-        });
-        toast.success(`Đã trả về chấm lại đề tài của ${report.groupName} cho GV. ${currentClass.lecturer}!`, { id: 'reject-action' });
-        
+        toast.loading('Đang gửi yêu cầu phúc khảo...', { id: 'appeal-action' });
+        await academicService.createAppealByAcademic(targetRejectReportId, rejectReason.trim());
+        toast.success(
+          `Đã gửi yêu cầu phúc khảo đề tài "${report.topicName}" tới GV. ${currentClass.lecturer}!`,
+          { id: 'appeal-action' },
+        );
+
         setShowRejectModal(false);
         loadData();
       } catch (error: any) {
-        toast.error(`Yêu cầu thất bại: ${error.message}`, { id: 'reject-action' });
+        const msg = error?.response?.data?.message || error.message;
+        toast.error(`Yêu cầu phúc khảo thất bại: ${msg}`, { id: 'appeal-action' });
       }
     }
   };
 
-  // UC-16 (BATCH): phê duyệt nhanh toàn bộ đề tài CHO_DUYET trong lớp — qua endpoint mới
-  // (BE flip cả Grade.isApproved và submission.status sang HOAN_THANH trong 1 giao dịch/bài).
-  const handleBatchApproveAll = async () => {
-    if (!currentClass || !isBatchApproveEnabled) return;
-
-    const toApprove = currentClass.reports.filter(r => r.status === 'CHO_DUYET' && r.score !== null);
-    if (toApprove.length === 0) {
-      toast.info('Không có đề tài nào cần phê duyệt bổ sung.', { id: 'batch-approve' });
-      return;
-    }
-
-    try {
-      toast.loading(`Đang phê duyệt ${toApprove.length} bài...`, { id: 'batch-approve' });
-      const res = await academicService.batchApproveGrades({
-        submissionIds: toApprove.map(r => r.id),
-        action: 'APPROVE',
-      });
-      toast.success(`Đã phê duyệt ${res.successCount}/${res.totalRequested} bài lớp ${currentClass.code}.`, { id: 'batch-approve' });
-      if (res.failedCount > 0) {
-        setBulkLastResults(res.results);
-      }
-      loadData();
-    } catch (error: any) {
-      const msg = error?.response?.data?.message || error.message;
-      toast.error(`Duyệt hàng loạt thất bại: ${msg}`, { id: 'batch-approve' });
-    }
-  };
-
-  // UC-16 (BATCH): xác nhận hành động theo lựa chọn checkbox.
+  // Yêu cầu phúc khảo theo lô (gọi tuần tự từng bài đã chọn).
   const handleConfirmBulk = async () => {
     if (!bulkAction || selectedReportIds.size === 0) return;
-    if (bulkAction === 'RETURN' && bulkReason.trim().length < 5) {
-      toast.error('Lý do trả về phải có ít nhất 5 ký tự');
+    if (bulkReason.trim().length < 20) {
+      toast.error('Lý do yêu cầu phúc khảo phải có ít nhất 20 ký tự');
       return;
     }
-    try {
-      setBulkSubmitting(true);
-      const res = await academicService.batchApproveGrades({
-        submissionIds: [...selectedReportIds],
-        action: bulkAction,
-        reason: bulkAction === 'RETURN' ? bulkReason.trim() : undefined,
-      });
-      const verb = bulkAction === 'APPROVE' ? 'phê duyệt' : 'trả về chấm lại';
-      toast.success(`Đã ${verb} ${res.successCount}/${res.totalRequested} bài.`);
-      setBulkLastResults(res.results);
-      setBulkAction(null);
-      setBulkReason('');
-      if (res.failedCount === 0) {
-        clearSelection();
+
+    setBulkSubmitting(true);
+    const ids = [...selectedReportIds];
+    const results: Array<
+      | { submissionId: string; status: 'SUCCESS' }
+      | { submissionId: string; status: 'FAILED'; reason: string }
+    > = [];
+    let successCount = 0;
+
+    for (const id of ids) {
+      try {
+        await academicService.createAppealByAcademic(id, bulkReason.trim());
+        results.push({ submissionId: id, status: 'SUCCESS' });
+        successCount += 1;
+      } catch (error: any) {
+        const msg = error?.response?.data?.message || error.message || 'Lỗi không xác định';
+        results.push({ submissionId: id, status: 'FAILED', reason: msg });
       }
-      loadData();
-    } catch (error: any) {
-      const msg = error?.response?.data?.message || error.message;
-      toast.error(`Xử lý theo lô thất bại: ${msg}`);
-    } finally {
-      setBulkSubmitting(false);
     }
+
+    const failedCount = ids.length - successCount;
+    setBulkLastResults(results);
+    toast.success(`Đã gửi yêu cầu phúc khảo ${successCount}/${ids.length} bài.`);
+    setBulkAction(null);
+    setBulkReason('');
+    if (failedCount === 0) {
+      clearSelection();
+    }
+    setBulkSubmitting(false);
+    loadData();
   };
 
   return (
@@ -368,10 +298,10 @@ export default function AcademicApprovals() {
       {/* HEADER SECTION */}
       <div className="shrink-0">
         <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
-          Phê duyệt Kết quả Chấm điểm <FileCheck2 className="w-8 h-8 text-indigo-500" />
+          Rà soát & Yêu cầu phúc khảo <FileCheck2 className="w-8 h-8 text-indigo-500" />
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold mt-1">
-          Rà soát kết quả chấm thi, cơ cấu phổ điểm Rubric và phê duyệt chính thức công khai.
+          Rà soát kết quả chấm thi, phổ điểm Rubric và chủ động gửi yêu cầu phúc khảo nếu cần GV chấm lại.
         </p>
       </div>
 
@@ -384,8 +314,8 @@ export default function AcademicApprovals() {
           <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-4">
             <CheckCircle className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Hoàn tất phê duyệt toàn bộ khoa!</h2>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm text-center font-medium">Hiện không còn lớp học phần hoặc đề tài nào đang ở trạng thái Chờ phê duyệt điểm.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Không có bài cần rà soát!</h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm text-center font-medium">Hiện không còn lớp học phần hoặc đề tài nào để rà soát điểm hoặc yêu cầu phúc khảo.</p>
         </div>
       ) : (
         /* DUAL PANEL LAYOUT */
@@ -404,7 +334,7 @@ export default function AcademicApprovals() {
               <div className="p-3 space-y-2.5">
                 {paginatedClasses.map((cls) => {
                   const totalReports = cls.reports.length;
-                  const doneReports = cls.reports.filter(r => r.status === 'HOAN_THANH').length;
+                  const doneReports = cls.reports.filter(r => r.status === 'DA_CHAM').length;
                   const isSelected = selectedClassId === cls.id;
 
                   return (
@@ -486,16 +416,11 @@ export default function AcademicApprovals() {
                           Đã chọn {selectedReportIds.size} bài
                         </span>
                         <button
-                          onClick={() => setBulkAction('APPROVE')}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
+                          onClick={() => setBulkAction('APPEAL')}
+                          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer flex items-center gap-1"
                         >
-                          Phê duyệt {selectedReportIds.size}
-                        </button>
-                        <button
-                          onClick={() => setBulkAction('RETURN')}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
-                        >
-                          Trả về {selectedReportIds.size}
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Yêu cầu phúc khảo {selectedReportIds.size}
                         </button>
                         <button
                           onClick={clearSelection}
@@ -504,22 +429,6 @@ export default function AcademicApprovals() {
                           Bỏ chọn
                         </button>
                       </>
-                    )}
-                    {isBatchApproveEnabled ? (
-                      <button
-                        onClick={handleBatchApproveAll}
-                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
-                      >
-                        Duyệt nhanh tất cả
-                      </button>
-                    ) : (
-                      <button
-                        disabled
-                        title="Chỉ khả dụng khi tất cả đề tài đã có điểm, nhận xét, rubric và ở trạng thái Chờ phê duyệt."
-                        className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all cursor-not-allowed"
-                      >
-                        Duyệt nhanh tất cả
-                      </button>
                     )}
                   </div>
                 </div>
@@ -562,15 +471,15 @@ export default function AcademicApprovals() {
                         )}
 
                         <div className="flex items-start justify-between gap-4">
-                          {/* UC-16 (BATCH): checkbox để chọn nhiều bài CHO_DUYET. */}
-                          {report.status === 'CHO_DUYET' && report.score !== null && (
+                          {/* Checkbox để chọn bài gửi phúc khảo theo lô (cần có điểm). */}
+                          {report.score !== null && (
                             <input
                               type="checkbox"
                               checked={selectedReportIds.has(report.id)}
                               onClick={(e) => e.stopPropagation()}
                               onChange={() => toggleReportSelection(report.id)}
-                              className="mt-1 h-4 w-4 cursor-pointer accent-indigo-600 shrink-0"
-                              title="Chọn để duyệt / trả về theo lô"
+                              className="mt-1 h-4 w-4 cursor-pointer accent-violet-600 shrink-0"
+                              title="Chọn để gửi yêu cầu phúc khảo theo lô"
                             />
                           )}
                           <div className="space-y-1 min-w-0 flex-1">
@@ -582,13 +491,11 @@ export default function AcademicApprovals() {
                             </h4>
                           </div>
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-[9px] font-extrabold shrink-0 whitespace-nowrap ${
-                            report.status === 'HOAN_THANH' 
+                            report.status === 'DA_CHAM'
                               ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400'
-                              : report.status === 'DANG_CHAM'
-                              ? 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-950/40 dark:text-rose-400'
-                              : 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/40 dark:text-amber-400'
+                              : 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-950/40 dark:text-rose-400'
                           }`}>
-                            {report.status === 'HOAN_THANH' ? 'Đã phê duyệt' : report.status === 'DANG_CHAM' ? 'Đang chấm' : 'Chờ phê duyệt'}
+                            {report.status === 'DA_CHAM' ? 'Đã chấm' : 'Đang chấm'}
                           </span>
                         </div>
 
@@ -610,42 +517,26 @@ export default function AcademicApprovals() {
                               e.stopPropagation();
                               handleOpenRejectModal(report.id);
                             }}
-                            disabled={report.status === 'HOAN_THANH'}
-                            className={`px-3 py-1.5 border rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all ${
-                              report.status === 'HOAN_THANH' 
-                                ? 'opacity-40 cursor-not-allowed border-slate-100 border-slate-200 dark:border-slate-800' 
-                                : 'border-rose-150 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-500 border-rose-100 dark:border-rose-900/30 cursor-pointer'
+                            disabled={report.score === null}
+                            title={report.score === null ? 'Cần GV hoàn tất chấm điểm trước khi gửi phúc khảo.' : 'Gửi yêu cầu phúc khảo / chấm lại'}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all text-white ${
+                              report.score === null
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                : 'bg-violet-600 hover:bg-violet-700 shadow-sm cursor-pointer'
                             }`}
                           >
-                            <XCircle className="w-3.5 h-3.5" />
-                            Trả về chấm lại
+                            {report.score === null ? (
+                              <>
+                                <Ban className="w-3.5 h-3.5 text-slate-400" />
+                                Chưa đủ điều kiện phúc khảo
+                              </>
+                            ) : (
+                              <>
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                Yêu cầu phúc khảo
+                              </>
+                            )}
                           </button>
-                          {report.score !== null ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleApproveReport(report.id);
-                              }}
-                              disabled={report.status === 'HOAN_THANH'}
-                              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all text-white ${
-                                report.status === 'HOAN_THANH' 
-                                  ? 'bg-emerald-500/50 cursor-not-allowed' 
-                                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-sm cursor-pointer'
-                              }`}
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              Phê duyệt điểm
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              title="Cần giảng viên hoàn tất chấm điểm trước khi phê duyệt."
-                              className="px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 cursor-not-allowed"
-                            >
-                              <Ban className="w-3.5 h-3.5 text-slate-400" />
-                              Chưa đủ điều kiện phê duyệt
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
@@ -810,27 +701,32 @@ export default function AcademicApprovals() {
         </div>
       )}
 
-      {/* REJECT/REGRADING REASON DIALOG MODAL */}
+      {/* MODAL YÊU CẦU PHÚC KHẢO */}
       {showRejectModal && currentClass && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-200 text-left text-slate-800 dark:text-slate-100">
-            <h3 className="text-lg font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-rose-500" />
-              Trả về chấm lại kết quả
+            <h3 className="text-lg font-black text-violet-600 dark:text-violet-400 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-violet-500" />
+              Yêu cầu phúc khảo điểm
             </h3>
             <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-              Trả về cho giảng viên {currentClass.lecturer} chấm lại hoặc rà soát lại bài nộp. Trạng thái đề tài sẽ được chuyển về <span className="font-bold text-indigo-600">Chờ chấm</span> để giảng viên cập nhật điểm số mới.
+              PĐT chủ động yêu cầu phúc khảo bài nộp này. Giảng viên {currentClass.lecturer} sẽ phải chấm lại — bài chuyển về trạng thái <span className="font-bold text-indigo-600">Đang chấm</span>, đơn phúc khảo được lưu vết tại trang Yêu cầu phúc khảo.
             </p>
-            
+
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lý do từ chối cụ thể</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Lý do yêu cầu phúc khảo (tối thiểu 20 ký tự)
+              </label>
               <textarea
                 rows={4}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Nhập lý do chi tiết (ví dụ: thiếu phần phân tích yêu cầu, rubric tiêu chí A chưa đạt, yêu cầu làm việc với SV)..."
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
+                placeholder="Nhập lý do chi tiết (ví dụ: rubric tiêu chí A chưa thuyết phục, phổ điểm lệch so với mặt bằng lớp, đề nghị GV rà soát lại phần phân tích yêu cầu)..."
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-semibold"
               />
+              <p className="text-[10px] font-semibold text-slate-400">
+                {rejectReason.trim().length}/20 ký tự
+              </p>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -844,43 +740,45 @@ export default function AcademicApprovals() {
                 Hủy bỏ
               </button>
               <button
-                onClick={handleSendReject}
-                className="px-4 py-2 text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-lg shadow-md flex items-center gap-1 cursor-pointer"
+                onClick={handleSendAppeal}
+                disabled={rejectReason.trim().length < 20}
+                className="px-4 py-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-lg shadow-md flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-3.5 h-3.5" />
-                Gửi yêu cầu
+                Gửi yêu cầu phúc khảo
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* UC-16 (BATCH): xác nhận hành động theo lô */}
+      {/* MODAL YÊU CẦU PHÚC KHẢO THEO LÔ */}
       {bulkAction && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 text-left text-slate-800 dark:text-slate-100">
-            <h3 className={`text-lg font-black flex items-center gap-2 ${bulkAction === 'APPROVE' ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {bulkAction === 'APPROVE' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-              {bulkAction === 'APPROVE' ? 'Phê duyệt theo lô' : 'Trả về chấm lại theo lô'}
+            <h3 className="text-lg font-black flex items-center gap-2 text-violet-600">
+              <MessageSquare className="w-5 h-5" />
+              Yêu cầu phúc khảo theo lô
             </h3>
             <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-              {bulkAction === 'APPROVE'
-                ? `Phê duyệt chính thức ${selectedReportIds.size} bài đã chọn. Bài sẽ chuyển sang trạng thái Hoàn thành và sinh viên xem được điểm.`
-                : `Trả về ${selectedReportIds.size} bài cho giảng viên chấm lại. Bài chuyển về trạng thái Đang chấm kèm lý do chung dưới đây.`}
+              Gửi yêu cầu phúc khảo cho {selectedReportIds.size} bài đã chọn. Tất cả sẽ chuyển về trạng thái <span className="font-bold text-indigo-600">Đang chấm</span> kèm lý do chung dưới đây, đồng thời tạo đơn phúc khảo lưu vết.
             </p>
 
-            {bulkAction === 'RETURN' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lý do trả về (áp dụng cho cả lô)</label>
-                <textarea
-                  rows={3}
-                  value={bulkReason}
-                  onChange={(e) => setBulkReason(e.target.value)}
-                  placeholder="Tối thiểu 5 ký tự, ví dụ: 'Phổ điểm lệch so với rubric chung của lớp, đề nghị GV kiểm tra lại.'"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-semibold"
-                />
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Lý do phúc khảo (áp dụng cho cả lô, tối thiểu 20 ký tự)
+              </label>
+              <textarea
+                rows={3}
+                value={bulkReason}
+                onChange={(e) => setBulkReason(e.target.value)}
+                placeholder="Ví dụ: Phổ điểm lệch so với rubric chung của lớp, đề nghị GV kiểm tra lại phần phân tích yêu cầu."
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-semibold"
+              />
+              <p className="text-[10px] font-semibold text-slate-400">
+                {bulkReason.trim().length}/20 ký tự
+              </p>
+            </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button
@@ -892,10 +790,10 @@ export default function AcademicApprovals() {
               </button>
               <button
                 onClick={handleConfirmBulk}
-                disabled={bulkSubmitting}
-                className={`px-4 py-2 text-xs font-bold text-white rounded-lg cursor-pointer disabled:opacity-50 ${bulkAction === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+                disabled={bulkSubmitting || bulkReason.trim().length < 20}
+                className="px-4 py-2 text-xs font-bold text-white rounded-lg cursor-pointer disabled:opacity-50 bg-violet-600 hover:bg-violet-700"
               >
-                {bulkSubmitting ? 'Đang xử lý…' : (bulkAction === 'APPROVE' ? `Phê duyệt ${selectedReportIds.size} bài` : `Trả về ${selectedReportIds.size} bài`)}
+                {bulkSubmitting ? 'Đang xử lý…' : `Gửi phúc khảo ${selectedReportIds.size} bài`}
               </button>
             </div>
           </div>
