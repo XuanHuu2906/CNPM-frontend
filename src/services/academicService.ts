@@ -239,7 +239,7 @@ export const academicService = {
   // ==========================================
   // PHÊ DUYỆT ĐIỂM SỐ (GRADE APPROVALS - UC-16)
   // ==========================================
-  approveGrade: async (submissionId: string, data: { isApproved: boolean; version: number }): Promise<any> => {
+  approveGrade: async (submissionId: string, data: { isApproved: boolean; version: number; reason?: string }): Promise<any> => {
     const response = await apiClient.put(`/system/grades/${submissionId}/approve`, data);
     return response.data.data;
   },

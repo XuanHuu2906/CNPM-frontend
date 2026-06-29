@@ -247,6 +247,9 @@ export default function GradingList() {
                       const isComplete = ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(group.status);
                       const isDraft = group.status === 'DANG_CHAM';
                       const isUnsubmitted = group.status === 'CHUA_NOP';
+                      // Đang yêu cầu sửa / từ chối → không cho chấm (chờ SV nộp lại hoặc bài đã loại).
+                      const isWaitingForFix = group.status === 'YEU_CAU_SUA';
+                      const isRejected = group.status === 'TU_CHOI';
 
                       return (
                         <tr key={group.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
@@ -307,7 +310,17 @@ export default function GradingList() {
                               </button>
                             )}
 
-                            {!isUnsubmitted && hasRubrics && (
+                            {!isUnsubmitted && hasRubrics && (isWaitingForFix || isRejected) && (
+                              <button
+                                disabled
+                                title={isWaitingForFix ? 'Đang chờ sinh viên nộp lại' : 'Bài đã bị từ chối'}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-xl text-xs font-bold cursor-not-allowed"
+                              >
+                                {isWaitingForFix ? 'Chờ SV sửa' : 'Đã từ chối'}
+                              </button>
+                            )}
+
+                            {!isUnsubmitted && hasRubrics && !isWaitingForFix && !isRejected && (
                               <button
                                 onClick={() => {
                                   const selectedClassObj = classes.find(c => c.id === selectedClass);

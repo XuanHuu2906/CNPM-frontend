@@ -498,8 +498,10 @@ export default function GradingWorkshop() {
     return () => window.removeEventListener('conflictError', triggerConflictError);
   }, []);
 
+  // YEU_CAU_SUA / TU_CHOI cũng readonly: GV đã yêu cầu SV sửa hoặc bài đã loại
+  // → không cho thao tác chấm để tránh ghi đè dữ liệu khi SV nộp lại.
   const isReadOnly: boolean = stateData?.readOnly === true ||
-    Boolean(submission && ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(submission.status));
+    Boolean(submission && ['DA_CHAM', 'CHO_DUYET', 'HOAN_THANH', 'YEU_CAU_SUA', 'TU_CHOI'].includes(submission.status));
 
   if (!stateData) {
     return <GradingList />;

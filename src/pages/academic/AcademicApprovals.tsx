@@ -118,8 +118,18 @@ export default function AcademicApprovals() {
 
           const grade = sub.grades && sub.grades.length > 0 ? sub.grades[0] : null;
           const isApproved = grade?.isApproved || false;
-          // Trạng thái: HOAN_THANH (PDT đã duyệt), CHO_DUYET (GV đã chấm, chờ duyệt), DANG_CHAM (chưa chấm hoặc bị trả về)
-          const status: 'DANG_CHAM' | 'CHO_DUYET' | 'HOAN_THANH' = isApproved ? 'HOAN_THANH' : (grade ? 'CHO_DUYET' : 'DANG_CHAM');
+          // Map status dựa trên submission.status thật (không dựa vào "có grade").
+          // Lý do: GV "Lưu nháp" tạo Grade record nhưng submission vẫn DA_NOP → trước đây sẽ bị
+          // hiển thị nhầm thành CHO_DUYET → PĐT thấy nút phê duyệt cho bản nháp (bug critical).
+          let status: 'DANG_CHAM' | 'CHO_DUYET' | 'HOAN_THANH';
+          if (isApproved) {
+            status = 'HOAN_THANH';
+          } else if (sub.status === 'CHO_DUYET') {
+            status = 'CHO_DUYET';
+          } else {
+            // DA_NOP / DA_CHAM (nháp) / DANG_CHAM / YEU_CAU_SUA / TU_CHOI / CHUA_NOP → đều coi là chưa sẵn sàng duyệt.
+            status = 'DANG_CHAM';
+          }
 
           // Đọc phân rã Rubric từ detailedScores
           const rubricBreakdown = grade?.rubric?.criteria?.map((crit: any) => {
@@ -150,7 +160,9 @@ export default function AcademicApprovals() {
             status,
             rubricBreakdown,
             version: grade?.version || 1,
-            fileUrl: sub.fileUrl || ''
+            // BE schema trả về filePath (map "DuongDanFile"); fileUrl không tồn tại
+            // → trước đây luôn rỗng → link "Mở tệp báo cáo" trở thành href="#" → scroll lên top trang.
+            fileUrl: sub.filePath || sub.fileUrl || ''
           };
         }).filter((r: TopicReport) => r.status !== 'DANG_CHAM');
 
@@ -267,8 +279,12 @@ export default function AcademicApprovals() {
 
       try {
         toast.loading('Đang gửi yêu cầu trả về chấm lại...', { id: 'reject-action' });
-        // Gỡ duyệt điểm để GV cập nhật lại
-        await academicService.approveGrade(targetRejectReportId, { isApproved: false, version: report.version });
+        // Gỡ duyệt điểm + đồng bộ status về DANG_CHAM kèm lý do để GV cập nhật lại.
+        await academicService.approveGrade(targetRejectReportId, {
+          isApproved: false,
+          version: report.version,
+          reason: rejectReason.trim(),
+        });
         toast.success(`Đã trả về chấm lại đề tài của ${report.groupName} cho GV. ${currentClass.lecturer}!`, { id: 'reject-action' });
         
         setShowRejectModal(false);
@@ -709,15 +725,27 @@ export default function AcademicApprovals() {
                   </div>
 
                   <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/10 flex flex-col gap-2 shrink-0">
-                    <a
-                      href={currentReport.fileUrl || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-1 cursor-pointer border border-slate-200/50"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Mở tệp báo cáo
-                    </a>
+                    {currentReport.fileUrl ? (
+                      <a
+                        href={currentReport.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-1 cursor-pointer border border-slate-200/50"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Mở tệp báo cáo
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        title="Chưa có tệp báo cáo"
+                        className="w-full py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1 cursor-not-allowed border border-slate-200/50"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Chưa có tệp báo cáo
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
