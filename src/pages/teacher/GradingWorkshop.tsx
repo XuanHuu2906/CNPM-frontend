@@ -935,41 +935,35 @@ export default function GradingWorkshop() {
           </div>
           {/* ACTION BUTTON PANEL */}
           {!isReadOnly ? (
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-3 bg-slate-50/50 dark:bg-slate-950/20 shrink-0">
-              <button
-                onClick={() => handleSaveGrade(false)}
-                disabled={saving || !selectedRubricId}
-                className="flex items-center justify-center gap-1.5 py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100/50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Lưu bản nháp điểm
-              </button>
-              <button
-                onClick={() => {
-                  setConfirmSubmitChecked(false);
-                  setShowConfirmSubmitModal(true);
-                }}
-                disabled={saving || !selectedRubricId}
-                className="flex items-center justify-center gap-1.5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all text-xs shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                Chấp nhận & Gửi đi
-              </button>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 shrink-0 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleSaveGrade(false)}
+                  disabled={saving || !selectedRubricId}
+                  className="flex items-center justify-center gap-1.5 py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100/50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Lưu bản nháp điểm
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmSubmitChecked(false);
+                    setShowConfirmSubmitModal(true);
+                  }}
+                  disabled={saving || !selectedRubricId}
+                  className="flex items-center justify-center gap-1.5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all text-xs shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Chấp nhận & Gửi đi
+                </button>
+              </div>
               <button
                 onClick={() => setShowEditRequestModal(true)}
                 disabled={actionLoading}
-                className="flex items-center justify-center gap-1.5 py-3 rounded-xl font-bold transition-all text-xs border bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/10 dark:hover:bg-rose-950/20 text-rose-500 border-rose-100/60 dark:border-rose-900/40"
+                className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl font-bold transition-all text-xs border bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/10 dark:hover:bg-rose-950/20 text-rose-500 border-rose-100/60 dark:border-rose-900/40"
               >
                 <AlertTriangle className="w-4 h-4" />
                 Yêu cầu sửa (Edit)
-              </button>
-              <button
-                onClick={() => setShowViolationModal(true)}
-                disabled={actionLoading}
-                className="flex items-center justify-center gap-1.5 py-3 rounded-xl font-bold transition-all text-xs border bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/10 dark:hover:bg-slate-950/20 text-slate-500 border-slate-200 dark:border-slate-800"
-              >
-                <XCircle className="w-4 h-4" />
-                Từ chối bài nộp
               </button>
             </div>
           ) : (
