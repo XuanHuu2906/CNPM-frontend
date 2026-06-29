@@ -227,18 +227,18 @@ export default function GradingList() {
                 <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
               </div>
             ) : (
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+              <table className="w-full text-left border-collapse min-w-[1180px]">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-4 px-6 w-24">Mã bài</th>
-                    <th className="py-4 px-6 max-w-[200px]">Đề tài</th>
-                    <th className="py-4 px-6 w-32">Nhóm</th>
-                    <th className="py-4 px-6 w-32">Ngày nộp</th>
-                    <th className="py-4 px-6 w-24">Phiên bản</th>
-                    <th className="py-4 px-6 w-36">Trạng thái Rubric</th>
-                    <th className="py-4 px-6 w-36">Trạng thái</th>
-                    <th className="py-4 px-6 w-24">Điểm</th>
-                    <th className="py-4 px-6 w-56 text-right">Thao tác</th>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 w-[90px] whitespace-nowrap">Mã bài</th>
+                    <th className="py-3 px-4 min-w-[260px]">Đề tài</th>
+                    <th className="py-3 px-4 w-[120px] whitespace-nowrap">Nhóm</th>
+                    <th className="py-3 px-4 w-[110px] whitespace-nowrap">Ngày nộp</th>
+                    <th className="py-3 px-4 w-[80px] whitespace-nowrap text-center">Phiên bản</th>
+                    <th className="py-3 px-4 w-[110px] whitespace-nowrap text-center">Rubric</th>
+                    <th className="py-3 px-4 w-[120px] whitespace-nowrap text-center">Trạng thái</th>
+                    <th className="py-3 px-4 w-[80px] whitespace-nowrap text-center">Điểm</th>
+                    <th className="py-3 px-4 w-[200px] text-right whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -250,43 +250,43 @@ export default function GradingList() {
 
                       return (
                         <tr key={group.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
-                          <td className="py-5 px-6 font-mono font-bold text-slate-900 dark:text-slate-100 text-xs truncate max-w-[100px]" title={group.id}>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 text-xs whitespace-nowrap" title={group.id}>
                             {group.id.slice(-6).toUpperCase()}
                           </td>
-                          <td className="py-5 px-6 max-w-[200px]">
-                            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-snug line-clamp-2">
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-snug line-clamp-2" title={group.topic}>
                               {group.topic}
                             </p>
                           </td>
-                          <td className="py-5 px-6 font-semibold text-slate-700 text-sm">
+                          <td className="py-3.5 px-4 font-semibold text-slate-700 text-sm whitespace-nowrap">
                             {group.groupName}
                           </td>
-                          <td className="py-5 px-6 text-slate-500 dark:text-slate-400 text-sm font-medium">
+                          <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-sm font-medium whitespace-nowrap">
                             {group.submissionDate || '--'}
                           </td>
-                          <td className="py-5 px-6 text-slate-500 font-semibold text-sm">
+                          <td className="py-3.5 px-4 text-slate-500 font-semibold text-sm text-center whitespace-nowrap">
                             v{group.version}
                           </td>
-                          <td className="py-5 px-6">
+                          <td className="py-3.5 px-4 text-center">
                             {hasRubrics ? (
-                              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">Đã có Rubric</span>
+                              <span className="inline-block text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">Đã có</span>
                             ) : (
-                              <span className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl">Chưa có Rubric</span>
+                              <span className="inline-block text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full whitespace-nowrap">Chưa có</span>
                             )}
                           </td>
-                          <td className="py-5 px-6">
-                            {getSubmitStatusBadge(group.status)}
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="inline-block whitespace-nowrap">{getSubmitStatusBadge(group.status)}</span>
                           </td>
-                          <td className="py-5 px-6">
+                          <td className="py-3.5 px-4 text-center">
                             {['DANG_CHAM', 'DA_CHAM', 'CHO_DUYET', 'HOAN_THANH'].includes(group.status) ? (
-                              <span className="text-base font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 px-2.5 py-1 rounded-xl shadow-sm">
+                              <span className="inline-block text-sm font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 px-2 py-0.5 rounded-lg shadow-sm whitespace-nowrap">
                                 {group.score !== null ? group.score.toFixed(1) : '--'}
                               </span>
                             ) : (
                               <span className="text-slate-400 italic font-normal text-sm">--</span>
                             )}
                           </td>
-                          <td className="py-5 px-6 text-right space-x-2 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-right space-x-2 whitespace-nowrap">
                             {isUnsubmitted && (
                               <button
                                 onClick={() => toast.info('Đã ghi nhận yêu cầu nhắc nộp. Chức năng sẽ gửi thông báo khi module thông báo được tích hợp.')}
@@ -310,6 +310,7 @@ export default function GradingList() {
                             {!isUnsubmitted && hasRubrics && (
                               <button
                                 onClick={() => {
+                                  const selectedClassObj = classes.find(c => c.id === selectedClass);
                                   navigate('/teacher/grading', {
                                     state: {
                                       submissionId: group.id,
@@ -318,6 +319,7 @@ export default function GradingList() {
                                       members: group.members,
                                       version: group.version,
                                       classId: selectedClass,
+                                      classCode: selectedClassObj?.code,
                                       readOnly: isComplete
                                     }
                                   });

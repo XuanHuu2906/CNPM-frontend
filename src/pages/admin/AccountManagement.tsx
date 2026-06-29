@@ -17,7 +17,10 @@ import {
   Eye,
   UserMinus,
   AlertTriangle,
-  ChevronDown
+  ChevronDown,
+  Upload,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -79,6 +82,25 @@ export default function AccountManagement() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [newPasswordValue, setNewPasswordValue] = useState('123456');
   const [copied, setCopied] = useState(false);
+
+  // Modal Import CSV States
+  type ImportRow = {
+    fullName: string;
+    email: string;
+    employeeCodeOrMssv: string;
+    phoneNumber?: string;
+    role: 'STUDENT' | 'TEACHER' | 'ACADEMIC_DEPT' | 'ADMIN';
+    classId?: string;
+  };
+  type ImportResultRow = { success: boolean; email: string; error?: string };
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
+  const [importParseErrors, setImportParseErrors] = useState<string[]>([]);
+  const [importResults, setImportResults] = useState<ImportResultRow[] | null>(null);
+  const [importEmailStats, setImportEmailStats] = useState<{ sent: number; eligible: number } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   // Tải dữ liệu người dùng từ API và đồng bộ
   const loadAccounts = async () => {
@@ -515,6 +537,158 @@ export default function AccountManagement() {
     return deactivatedList.includes(accountId);
   };
 
+  // ==========================================
+  // IMPORT CSV (BULK CREATE USERS) - UC-13
+  // ==========================================
+  // CSV header mapping: hỗ trợ cả tên cột tiếng Việt (theo template) và tên field thô (API)
+  const CSV_HEADER_ALIASES: Record<string, keyof ImportRow> = {
+    'họ và tên': 'fullName',
+    'fullname': 'fullName',
+    'email': 'email',
+    'mã số định danh (mssv)': 'employeeCodeOrMssv',
+    'mssv': 'employeeCodeOrMssv',
+    'mã định danh': 'employeeCodeOrMssv',
+    'employeecodeormssv': 'employeeCodeOrMssv',
+    'số điện thoại': 'phoneNumber',
+    'phonenumber': 'phoneNumber',
+    'vai trò': 'role',
+    'role': 'role',
+    'mã lớp học phần': 'classId',
+    'classid': 'classId',
+  };
+
+  const parseCsvLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuote) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') { inQuote = false; }
+        else { cur += c; }
+      } else {
+        if (c === '"') { inQuote = true; }
+        else if (c === ',') { out.push(cur); cur = ''; }
+        else { cur += c; }
+      }
+    }
+    out.push(cur);
+    return out.map(s => s.trim());
+  };
+
+  const parseCsvText = (text: string): { rows: ImportRow[]; errors: string[] } => {
+    const errors: string[] = [];
+    // strip BOM
+    const cleaned = text.replace(/^﻿/, '');
+    const lines = cleaned.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) {
+      return { rows: [], errors: ['File rỗng hoặc thiếu header.'] };
+    }
+    const rawHeaders = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+    const colIdx: Partial<Record<keyof ImportRow, number>> = {};
+    rawHeaders.forEach((h, i) => {
+      const field = CSV_HEADER_ALIASES[h];
+      if (field && colIdx[field] === undefined) colIdx[field] = i;
+    });
+    const required: (keyof ImportRow)[] = ['fullName', 'email', 'employeeCodeOrMssv', 'role'];
+    const missing = required.filter(f => colIdx[f] === undefined);
+    if (missing.length) {
+      return { rows: [], errors: [`Thiếu cột bắt buộc: ${missing.join(', ')}`] };
+    }
+    const rows: ImportRow[] = [];
+    for (let li = 1; li < lines.length; li++) {
+      const cols = parseCsvLine(lines[li]);
+      const get = (f: keyof ImportRow) => {
+        const idx = colIdx[f];
+        return idx !== undefined ? (cols[idx] ?? '').trim() : '';
+      };
+      const fullName = get('fullName');
+      const email = get('email');
+      const employeeCodeOrMssv = get('employeeCodeOrMssv');
+      const roleRaw = get('role').toUpperCase();
+      if (!fullName || !email || !employeeCodeOrMssv || !roleRaw) {
+        errors.push(`Dòng ${li + 1}: thiếu dữ liệu bắt buộc`);
+        continue;
+      }
+      if (!['STUDENT', 'TEACHER', 'ACADEMIC_DEPT', 'ADMIN'].includes(roleRaw)) {
+        errors.push(`Dòng ${li + 1}: vai trò "${roleRaw}" không hợp lệ`);
+        continue;
+      }
+      rows.push({
+        fullName,
+        email,
+        employeeCodeOrMssv,
+        phoneNumber: get('phoneNumber') || undefined,
+        role: roleRaw as ImportRow['role'],
+        classId: get('classId') || undefined,
+      });
+    }
+    return { rows, errors };
+  };
+
+  const handleImportFileSelected = async (file: File) => {
+    setImportFile(file);
+    setImportResults(null);
+    try {
+      const text = await file.text();
+      const { rows, errors } = parseCsvText(text);
+      setImportPreview(rows);
+      setImportParseErrors(errors);
+      if (rows.length === 0 && errors.length === 0) {
+        toast.warning('Không có dòng dữ liệu nào trong file.');
+      }
+    } catch (err: any) {
+      toast.error(`Không đọc được file: ${err.message}`);
+    }
+  };
+
+  const resetImportModal = () => {
+    setImportFile(null);
+    setImportPreview([]);
+    setImportParseErrors([]);
+    setImportResults(null);
+    setImportEmailStats(null);
+    setIsImporting(false);
+    if (importFileInputRef.current) importFileInputRef.current.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (importPreview.length === 0) {
+      toast.error('Không có dữ liệu hợp lệ để import.');
+      return;
+    }
+    if (importPreview.length > 500) {
+      toast.error('Mỗi lần import tối đa 500 tài khoản.');
+      return;
+    }
+    try {
+      setIsImporting(true);
+      toast.loading(`Đang tạo ${importPreview.length} tài khoản và gửi mail...`, { id: 'import-csv' });
+      const res: any = await adminService.createUsersBatch(importPreview);
+      // Backend trả về { results, emailEligibleCount, emailSentCount } (shape mới)
+      // Fallback: nếu là array thì giữ tương thích cũ.
+      const results: ImportResultRow[] = Array.isArray(res) ? res : (res?.results ?? []);
+      const emailEligible = Array.isArray(res) ? 0 : (res?.emailEligibleCount ?? 0);
+      const emailSent = Array.isArray(res) ? 0 : (res?.emailSentCount ?? 0);
+      setImportResults(results);
+      setImportEmailStats({ sent: emailSent, eligible: emailEligible });
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.length - successCount;
+      const mailMsg = emailEligible > 0 ? ` · Gửi mail ${emailSent}/${emailEligible}` : '';
+      if (failCount === 0) {
+        toast.success(`Đã tạo ${successCount} tài khoản!${mailMsg}`, { id: 'import-csv' });
+      } else {
+        toast.warning(`Hoàn tất: ${successCount} thành công, ${failCount} lỗi.${mailMsg}`, { id: 'import-csv' });
+      }
+      await loadAccounts();
+    } catch (err: any) {
+      toast.error(`Import thất bại: ${err.response?.data?.message || err.message}`, { id: 'import-csv' });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 text-left">
 
@@ -525,13 +699,23 @@ export default function AccountManagement() {
             Quản lý tài khoản toàn hệ thống
           </h1>
         </div>
-        <Button
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl px-5 py-6 shadow-lg shadow-violet-500/25 flex items-center gap-2 self-start md:self-auto transition-all active:scale-95"
-        >
-          <UserPlus className="w-5 h-5" />
-          Thêm tài khoản mới
-        </Button>
+        <div className="flex items-center gap-3 self-start md:self-auto">
+          <Button
+            variant="outline"
+            onClick={() => { resetImportModal(); setIsImportOpen(true); }}
+            className="font-bold rounded-xl px-5 py-6 border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-900 dark:text-violet-300 dark:hover:bg-violet-950/30 flex items-center gap-2 transition-all active:scale-95"
+          >
+            <Upload className="w-5 h-5" />
+            Import CSV
+          </Button>
+          <Button
+            onClick={() => setIsCreateOpen(true)}
+            className="bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl px-5 py-6 shadow-lg shadow-violet-500/25 flex items-center gap-2 transition-all active:scale-95"
+          >
+            <UserPlus className="w-5 h-5" />
+            Thêm tài khoản mới
+          </Button>
+        </div>
       </div>
 
       {/* DASHBOARD STATUS STATS */}
@@ -1415,6 +1599,167 @@ export default function AccountManagement() {
               </button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* IMPORT CSV DIALOG */}
+      <Dialog open={isImportOpen} onOpenChange={(open) => { if (!open) resetImportModal(); setIsImportOpen(open); }}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-violet-600 dark:text-violet-400">
+              <FileSpreadsheet className="w-5 h-5" /> Import tài khoản từ CSV
+            </DialogTitle>
+            <DialogDescription className="font-semibold text-slate-500 text-xs">
+              Upload file CSV chứa danh sách tài khoản. Mật khẩu khởi tạo mặc định <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded">123456</code> (nếu cột mật khẩu để trống). Tối đa 500 dòng/lần.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-left">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900">
+              <div className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+                Cần file mẫu? Tải template chuẩn ở đây.
+              </div>
+              <a
+                href="/templates/tai_khoan_sinh_vien_50.csv"
+                download
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 hover:underline"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Tải template
+              </a>
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-slate-500">Chọn file CSV</Label>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleImportFileSelected(f);
+                }}
+                className="mt-2 block w-full text-xs font-semibold text-slate-600 dark:text-slate-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-violet-600 file:text-white hover:file:bg-violet-700 file:cursor-pointer"
+              />
+              {importFile && (
+                <p className="mt-2 text-xs font-semibold text-slate-500">
+                  Đã chọn: <span className="text-slate-700 dark:text-slate-200">{importFile.name}</span> · {(importFile.size / 1024).toFixed(1)} KB
+                </p>
+              )}
+            </div>
+
+            {importParseErrors.length > 0 && (
+              <div className="px-4 py-3 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 space-y-1">
+                <p className="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Có {importParseErrors.length} lỗi khi đọc file:
+                </p>
+                <ul className="text-xs font-semibold text-rose-600 dark:text-rose-400 list-disc list-inside space-y-0.5 max-h-24 overflow-y-auto">
+                  {importParseErrors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}
+                  {importParseErrors.length > 10 && <li>... và {importParseErrors.length - 10} lỗi khác</li>}
+                </ul>
+              </div>
+            )}
+
+            {importPreview.length > 0 && !importResults && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                  Xem trước: <span className="text-violet-600">{importPreview.length}</span> tài khoản sẽ được tạo
+                </p>
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0">
+                      <tr className="text-left text-slate-500 font-bold">
+                        <th className="px-3 py-2">#</th>
+                        <th className="px-3 py-2">Họ tên</th>
+                        <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">MSSV/Mã</th>
+                        <th className="px-3 py-2">Vai trò</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.slice(0, 50).map((r, i) => (
+                        <tr key={i} className="border-t border-slate-100 dark:border-slate-800 font-semibold text-slate-700 dark:text-slate-300">
+                          <td className="px-3 py-1.5 text-slate-400">{i + 1}</td>
+                          <td className="px-3 py-1.5">{r.fullName}</td>
+                          <td className="px-3 py-1.5 text-slate-500">{r.email}</td>
+                          <td className="px-3 py-1.5">{r.employeeCodeOrMssv}</td>
+                          <td className="px-3 py-1.5">{getRoleLabel(r.role)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {importPreview.length > 50 && (
+                  <p className="text-xs text-slate-400 italic">Hiển thị 50/{importPreview.length} dòng đầu.</p>
+                )}
+              </div>
+            )}
+
+            {importResults && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                  Kết quả: <span className="text-emerald-600">{importResults.filter(r => r.success).length} thành công</span>
+                  {' · '}
+                  <span className="text-rose-600">{importResults.filter(r => !r.success).length} lỗi</span>
+                  {importEmailStats && importEmailStats.eligible > 0 && (
+                    <>
+                      {' · '}
+                      <span className="text-indigo-600">
+                        Gửi mail: {importEmailStats.sent}/{importEmailStats.eligible} (Sinh viên/Giảng viên)
+                      </span>
+                    </>
+                  )}
+                </p>
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0">
+                      <tr className="text-left text-slate-500 font-bold">
+                        <th className="px-3 py-2">Trạng thái</th>
+                        <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">Chi tiết</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importResults.map((r, i) => (
+                        <tr key={i} className="border-t border-slate-100 dark:border-slate-800 font-semibold">
+                          <td className="px-3 py-1.5">
+                            {r.success
+                              ? <span className="text-emerald-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> OK</span>
+                              : <span className="text-rose-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Lỗi</span>}
+                          </td>
+                          <td className="px-3 py-1.5 text-slate-500">{r.email}</td>
+                          <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">{r.error || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { resetImportModal(); setIsImportOpen(false); }}
+              className="rounded-xl font-bold"
+              disabled={isImporting}
+            >
+              {importResults ? 'Đóng' : 'Hủy bỏ'}
+            </Button>
+            {!importResults && (
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={isImporting || importPreview.length === 0}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl text-sm font-bold px-4 h-8 transition-all duration-200 outline-none select-none active:scale-[0.98] shadow-md bg-violet-600 hover:bg-violet-700 text-white shadow-violet-600/10 hover:shadow-violet-600/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {isImporting ? 'Đang import...' : `Import ${importPreview.length} tài khoản`}
+              </button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

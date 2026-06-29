@@ -1,0 +1,12 @@
+import XLSX from 'xlsx';
+const wb = XLSX.readFile('D:\\CNPM\\CNPM-frontend-push\\public\\templates\\LopHocPhan_CNPM_D23CQCN01-N.xlsx');
+const ws = wb.Sheets['Điểm Danh'];
+console.log('D2 (Học kỳ):', ws['D2']?.v);
+console.log('C4 (Tên môn):', ws['C4']?.v);
+console.log('E4 (Mã môn):', ws['E4']?.v);
+console.log('B6 (Mã lớp):', ws['B6']?.v);
+console.log('D6 (Mã GV):', ws['D6']?.v);
+console.log('A7 (header):', ws['A7']?.v, '|', ws['B7']?.v, '|', ws['C7']?.v, '|', ws['D7']?.v);
+console.log('Row 8 (SV đầu):', ws['A8']?.v, ws['B8']?.v, ws['C8']?.v, ws['D8']?.v);
+console.log('Row 138 (SV cuối):', ws['A138']?.v, ws['B138']?.v, ws['C138']?.v, ws['D138']?.v);
+console.log('Range:', ws['!ref']);

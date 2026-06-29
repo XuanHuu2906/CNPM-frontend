@@ -36,19 +36,85 @@ export default function SystemAuditTrail() {
   const itemsPerPage = 10;
 
   // Bản đồ ánh xạ hành động nghiệp vụ thân thiện và mức độ mặc định
+  const STYLE = {
+    info: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 border',
+    security: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 border',
+    warning: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 border',
+    critical: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 border',
+    grade: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 border',
+    import: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400 border',
+    submit: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/20 dark:text-sky-400 border',
+    system: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 border',
+  };
+
   const ACTION_MAP: Record<string, { label: string; level: 'INFO' | 'WARNING' | 'CRITICAL' | 'SECURITY'; style: string }> = {
-    'SERVER_START': { label: 'Khởi động hệ thống', level: 'INFO', style: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 border' },
-    'SEVER_START': { label: 'Khởi động hệ thống', level: 'INFO', style: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 border' },
-    'ACADEMIC_ASSIGN': { label: 'Phân công giảng viên', level: 'INFO', style: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 border' },
-    'DELETE': { label: 'Xóa dữ liệu', level: 'CRITICAL', style: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 border' },
-    'GRADE': { label: 'Thao tác điểm', level: 'INFO', style: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 border' },
-    'LOGIN': { label: 'Đăng nhập', level: 'SECURITY', style: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 border' },
+    // Mã hệ thống
+    'SERVER_START': { label: 'Khởi động hệ thống', level: 'INFO', style: STYLE.system },
+    'SEVER_START': { label: 'Khởi động hệ thống', level: 'INFO', style: STYLE.system },
+    'ACADEMIC_ASSIGN': { label: 'Phân công giảng viên', level: 'INFO', style: STYLE.info },
+    'DELETE': { label: 'Xóa dữ liệu', level: 'CRITICAL', style: STYLE.critical },
+    'GRADE': { label: 'Thao tác điểm', level: 'INFO', style: STYLE.grade },
+    'LOGIN': { label: 'Đăng nhập', level: 'SECURITY', style: STYLE.security },
     'LOGOUT': { label: 'Đăng xuất', level: 'SECURITY', style: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 border' },
-    'IMPORT': { label: 'Nhập dữ liệu', level: 'INFO', style: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400 border' },
-    'BACKUP': { label: 'Sao lưu', level: 'CRITICAL', style: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 border' },
+    'IMPORT': { label: 'Nhập dữ liệu', level: 'INFO', style: STYLE.import },
+    'BACKUP': { label: 'Sao lưu', level: 'CRITICAL', style: STYLE.warning },
     'RESTORE': { label: 'Phục hồi', level: 'CRITICAL', style: 'bg-rose-100 text-rose-800 border-rose-250 dark:bg-rose-950/40 dark:text-rose-300 border animate-pulse' },
-    'SUBMIT': { label: 'Nộp báo cáo', level: 'INFO', style: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/20 dark:text-sky-400 border' },
+    'SUBMIT': { label: 'Nộp báo cáo', level: 'INFO', style: STYLE.submit },
     'SYSTEM': { label: 'Hệ thống', level: 'INFO', style: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 border' },
+
+    // Xác thực & tài khoản
+    'DANG_NHAP': { label: 'Đăng nhập', level: 'SECURITY', style: STYLE.security },
+    'DOI_MAT_KHAU': { label: 'Đổi mật khẩu', level: 'SECURITY', style: STYLE.security },
+    'DAT_LAI_MAT_KHAU': { label: 'Đặt lại mật khẩu', level: 'SECURITY', style: STYLE.security },
+    'RESET_MAT_KHAU_ADMIN': { label: 'Reset mật khẩu (Admin)', level: 'WARNING', style: STYLE.warning },
+    'TAO_TAI_KHOAN': { label: 'Tạo tài khoản', level: 'INFO', style: STYLE.info },
+    'CAP_NHAT_VAI_TRO': { label: 'Cập nhật vai trò', level: 'WARNING', style: STYLE.warning },
+    'IMPORT_TAI_KHOAN_BATCH': { label: 'Nhập tài khoản hàng loạt', level: 'INFO', style: STYLE.import },
+
+    // Ghi chú & yêu cầu
+    'TAO_GHI_CHU_NOI_BO': { label: 'Tạo ghi chú nội bộ', level: 'INFO', style: STYLE.info },
+    'XOA_GHI_CHU_NOI_BO': { label: 'Xóa ghi chú nội bộ', level: 'WARNING', style: STYLE.warning },
+    'TAO_YEU_CAU_MO_LAI_CHAM': { label: 'Yêu cầu mở lại chấm', level: 'INFO', style: STYLE.info },
+    'DUYET_YEU_CAU_MO_LAI_CHAM': { label: 'Duyệt yêu cầu mở lại chấm', level: 'INFO', style: STYLE.info },
+    'TU_CHOI_YEU_CAU_MO_LAI_CHAM': { label: 'Từ chối yêu cầu mở lại chấm', level: 'WARNING', style: STYLE.warning },
+    'TAO_YEU_CAU_NOP_LAI': { label: 'Yêu cầu nộp lại', level: 'INFO', style: STYLE.info },
+    'DUYET_YEU_CAU_NOP_LAI': { label: 'Duyệt yêu cầu nộp lại', level: 'INFO', style: STYLE.info },
+    'TU_CHOI_YEU_CAU_NOP_LAI': { label: 'Từ chối yêu cầu nộp lại', level: 'WARNING', style: STYLE.warning },
+    'CAP_NHAT_TRANG_THAI_BAI': { label: 'Cập nhật trạng thái bài', level: 'INFO', style: STYLE.info },
+
+    // Rubric & chấm điểm
+    'TAO_RUBRIC': { label: 'Tạo rubric', level: 'INFO', style: STYLE.grade },
+    'XOA_RUBRIC': { label: 'Xóa rubric', level: 'CRITICAL', style: STYLE.critical },
+    'CHAM_DIEM_NHAP': { label: 'Chấm điểm (nháp)', level: 'INFO', style: STYLE.grade },
+    'CHAM_DIEM_CHINH_THUC': { label: 'Chấm điểm chính thức', level: 'INFO', style: STYLE.grade },
+    'DIEU_CHINH_DIEM_THANH_VIEN_NHOM': { label: 'Điều chỉnh điểm thành viên nhóm', level: 'INFO', style: STYLE.grade },
+
+    // Nhóm sinh viên
+    'TAO_NHOM': { label: 'Tạo nhóm', level: 'INFO', style: STYLE.info },
+    'CAP_NHAT_NHOM': { label: 'Cập nhật nhóm', level: 'INFO', style: STYLE.info },
+    'XOA_NHOM': { label: 'Xóa nhóm', level: 'CRITICAL', style: STYLE.critical },
+    'THEM_THANH_VIEN_NHOM': { label: 'Thêm thành viên nhóm', level: 'INFO', style: STYLE.info },
+    'GO_THANH_VIEN_NHOM': { label: 'Gỡ thành viên nhóm', level: 'WARNING', style: STYLE.warning },
+    'GIAO_DE_TAI': { label: 'Giao đề tài', level: 'INFO', style: STYLE.info },
+    'GAN_DE_TAI_CA_NHAN': { label: 'Gán đề tài cá nhân', level: 'INFO', style: STYLE.info },
+    'TU_DONG_CHIA_NHOM': { label: 'Tự động chia nhóm', level: 'INFO', style: STYLE.info },
+    'IMPORT_NHOM_BATCH': { label: 'Nhập nhóm hàng loạt', level: 'INFO', style: STYLE.import },
+    'IMPORT_NHOM_EXCEL': { label: 'Nhập nhóm từ Excel', level: 'INFO', style: STYLE.import },
+    'GV_GUI_DUYET_CA_LOP': { label: 'GV gửi duyệt cả lớp', level: 'INFO', style: STYLE.info },
+
+    // Học kỳ / môn / lớp
+    'TAO_HOC_KY': { label: 'Tạo học kỳ', level: 'INFO', style: STYLE.info },
+    'CAP_NHAT_HOC_KY': { label: 'Cập nhật học kỳ', level: 'INFO', style: STYLE.info },
+    'TAO_MON_HOC': { label: 'Tạo môn học', level: 'INFO', style: STYLE.info },
+    'PHAN_CONG_GV': { label: 'Phân công giảng viên', level: 'INFO', style: STYLE.info },
+    'HUY_PHAN_CONG_GV': { label: 'Hủy phân công giảng viên', level: 'WARNING', style: STYLE.warning },
+    'THAY_DOI_GV_PHU_TRACH': { label: 'Thay đổi GV phụ trách', level: 'WARNING', style: STYLE.warning },
+    'UPDATE_LOAI_PHAN_CONG': { label: 'Cập nhật loại phân công', level: 'INFO', style: STYLE.info },
+    'IMPORT_HOC_KY_BATCH': { label: 'Nhập học kỳ hàng loạt', level: 'INFO', style: STYLE.import },
+    'IMPORT_LOP_HOC_PHAN_BATCH': { label: 'Nhập lớp học phần hàng loạt', level: 'INFO', style: STYLE.import },
+    'IMPORT_LOP_EXCEL': { label: 'Nhập lớp học từ Excel', level: 'INFO', style: STYLE.import },
+    'IMPORT_SV_BATCH': { label: 'Nhập sinh viên hàng loạt', level: 'INFO', style: STYLE.import },
+    'IMPORT_DANG_KY_LOP_BATCH': { label: 'Nhập đăng ký lớp hàng loạt', level: 'INFO', style: STYLE.import },
   };
 
   const getLocalDateString = (d: Date) => {

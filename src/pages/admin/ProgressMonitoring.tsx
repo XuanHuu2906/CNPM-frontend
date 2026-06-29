@@ -40,7 +40,6 @@ interface SubmissionUI {
   semesterId: string;
   department: string;
   status: SubmissionStatus;
-  plagiarismScore: number;
   classCode: string;
   classId: string;
   version: number;
@@ -61,7 +60,6 @@ export default function ProgressMonitoring() {
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedClass, setSelectedClass] = useState('All');
   const [selectedTeacher, setSelectedTeacher] = useState('All');
-  const [selectedPlagRange, setSelectedPlagRange] = useState('All'); // All, NORMAL, NEED_CHECK, HIGH_ALERT
   const [showOnlyAlerts, setShowOnlyAlerts] = useState(false);
 
   // State Dialog Xử lý vi phạm (Reject/Review)
@@ -75,9 +73,6 @@ export default function ProgressMonitoring() {
   // State Dialog Xem chi tiết
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedSubForDetail, setSelectedSubForDetail] = useState<SubmissionUI | null>(null);
-
-  // Ngưỡng đạo văn từ hệ thống (20%)
-  const PLAGIARISM_THRESHOLD = 20;
 
   // Tải danh sách bài nộp thực tế từ Postgres DB
   const loadSubmissionsData = async () => {
@@ -106,7 +101,6 @@ export default function ProgressMonitoring() {
             ? 'HTTT'
             : 'KTMT';
 
-        const plagiarismScore = s.plagiarismScore || 0;
         const teacherId = s.grades?.[0]?.teacherId || cls?.assignments?.[0]?.teacherId || 'Chưa phân gv';
         const teacherName = s.grades?.[0]?.teacher?.user?.fullName || cls?.assignments?.[0]?.teacher?.user?.fullName || 'Chưa phân công';
 
@@ -124,7 +118,6 @@ export default function ProgressMonitoring() {
           semesterId: cls?.termId || cls?.term?.id || '—',
           department,
           status: s.status as SubmissionStatus,
-          plagiarismScore,
           classCode,
           classId: cls?.id || '—',
           version: s.version,
@@ -198,29 +191,19 @@ export default function ProgressMonitoring() {
 
     let matchesStatus = true;
     if (selectedStatus !== 'All') {
-      if (selectedStatus === 'PLAGIARISM_ALERT') {
-        matchesStatus = item.plagiarismScore > PLAGIARISM_THRESHOLD && item.status !== 'TU_CHOI';
-      } else if (selectedStatus === 'CHO_KIEM_TRA') {
+      if (selectedStatus === 'CHO_KIEM_TRA') {
         matchesStatus = !!(item.violationReason && item.violationReason.includes('"type":"CHO_KIEM_TRA"'));
       } else {
         matchesStatus = item.status === selectedStatus;
       }
     }
 
-    let matchesPlagRange = true;
-    if (selectedPlagRange !== 'All') {
-      if (selectedPlagRange === 'NORMAL') matchesPlagRange = item.plagiarismScore <= 20;
-      else if (selectedPlagRange === 'NEED_CHECK') matchesPlagRange = item.plagiarismScore > 20 && item.plagiarismScore <= 40;
-      else if (selectedPlagRange === 'HIGH_ALERT') matchesPlagRange = item.plagiarismScore > 40 && item.plagiarismScore <= 60;
-      else if (selectedPlagRange === 'CRITICAL') matchesPlagRange = item.plagiarismScore > 60;
-    }
-
     const delayInfo = getDelayInfo(item.submittedAt, item.deadlineAt);
     const hasPendingReview = !!(item.violationReason && (item.violationReason.includes('"type":"CHO_KIEM_TRA"') || item.violationReason.includes('"status":"CHO_KIEM_TRA"')));
-    const hasWarning = item.plagiarismScore > PLAGIARISM_THRESHOLD || delayInfo.hasAlert || hasPendingReview;
+    const hasWarning = delayInfo.hasAlert || hasPendingReview;
     const matchesOnlyAlerts = !showOnlyAlerts || hasWarning;
 
-    return matchesSearch && matchesSemester && matchesCourse && matchesClass && matchesTeacher && matchesStatus && matchesPlagRange && matchesOnlyAlerts;
+    return matchesSearch && matchesSemester && matchesCourse && matchesClass && matchesTeacher && matchesStatus && matchesOnlyAlerts;
   });
 
   // Tính toán số liệu thống kê (Stats Cards)
@@ -228,7 +211,6 @@ export default function ProgressMonitoring() {
   const completedCount = submissions.filter(s => s.status === 'HOAN_THANH').length;
   const pendingGradingCount = submissions.filter(s => ['DA_NOP', 'DANG_CHAM', 'YEU_CAU_SUA'].includes(s.status)).length;
   const pendingApprovalCount = submissions.filter(s => s.status === 'CHO_DUYET').length;
-  const plagiarismAlertCount = submissions.filter(s => s.plagiarismScore > PLAGIARISM_THRESHOLD && s.status !== 'TU_CHOI').length;
   const rejectedCount = submissions.filter(s => s.status === 'TU_CHOI').length;
 
   // Xử lý nộp quyết định từ chối vi phạm (Reject - TU_CHOI)
@@ -321,7 +303,7 @@ export default function ProgressMonitoring() {
   };
 
   // Helper render Badge trạng thái báo cáo tiếng Việt chuyên nghiệp
-  const renderStatusBadge = (status: SubmissionStatus, plagScore: number, violationReason?: string) => {
+  const renderStatusBadge = (status: SubmissionStatus, violationReason?: string) => {
     const isPendingReview = !!(violationReason && violationReason.includes('"type":"CHO_KIEM_TRA"'));
 
     if (isPendingReview) {
@@ -371,13 +353,6 @@ export default function ProgressMonitoring() {
         );
       case 'DA_NOP':
       default:
-        if (plagScore > PLAGIARISM_THRESHOLD) {
-          return (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40 animate-pulse shadow-sm">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" /> Nghi vấn đạo văn
-            </span>
-          );
-        }
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/20 dark:text-violet-400 dark:border-violet-900/40 shadow-sm">
             <FileText className="w-3.5 h-3.5 text-violet-500 shrink-0" /> Đã nộp — chờ GV chấm
@@ -457,14 +432,13 @@ export default function ProgressMonitoring() {
           </CardContent>
         </Card>
 
-        {/* PLAGIARISM ALERTS + VIOLATIONS */}
+        {/* REJECTED REPORTS */}
         <Card className="border-slate-200/60 dark:border-slate-800/60 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">Vi phạm / Nghi vấn</span>
+              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">Bị từ chối</span>
               <span className="text-2xl font-black text-rose-600 dark:text-rose-400 block">
-                {plagiarismAlertCount + rejectedCount}
-                <span className="text-xs font-semibold text-slate-400 ml-1">({rejectedCount} đã khóa)</span>
+                {rejectedCount}
               </span>
             </div>
             <div className="w-11 h-11 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
@@ -556,22 +530,6 @@ export default function ProgressMonitoring() {
               </select>
             </div>
 
-            {/* Plagiarism Range Select */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-500">Mức đạo văn</Label>
-              <select
-                value={selectedPlagRange}
-                onChange={e => setSelectedPlagRange(e.target.value)}
-                className="w-full h-10 px-3 py-2 rounded-xl border border-slate-200/80 bg-slate-50 focus:bg-white text-xs font-bold focus:ring-1 focus:ring-violet-500 focus:outline-none dark:bg-slate-950 dark:border-slate-800"
-              >
-                <option value="All">Tất cả mức độ</option>
-                <option value="NORMAL">Bình thường (0–20%)</option>
-                <option value="NEED_CHECK">Cần kiểm tra (21–40%)</option>
-                <option value="HIGH_ALERT">Nghi vấn cao (41–60%)</option>
-                <option value="CRITICAL">Rất nghiêm trọng (&gt;60%)</option>
-              </select>
-            </div>
-
             {/* Status Select */}
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-slate-500">Trạng thái báo cáo / Cảnh báo</Label>
@@ -582,7 +540,6 @@ export default function ProgressMonitoring() {
               >
                 <option value="All">Tất cả Trạng thái</option>
                 <option value="DA_NOP">Đã nộp — chờ GV chấm</option>
-                <option value="PLAGIARISM_ALERT">Nghi vấn Đạo văn (&gt; {PLAGIARISM_THRESHOLD}%)</option>
                 <option value="CHO_KIEM_TRA">Chờ Admin/GV kiểm tra</option>
                 <option value="YEU_CAU_SUA">Yêu cầu sửa điểm/nội dung</option>
                 <option value="DA_CHAM">Đã chấm điểm</option>
@@ -619,29 +576,28 @@ export default function ProgressMonitoring() {
               Danh sách chi tiết Tiến độ & Vi phạm ({filteredSubmissions.length} báo cáo)
             </CardTitle>
             <CardDescription className="text-xs font-semibold text-slate-400 mt-1">
-              Hiển thị danh sách báo cáo nộp, phiên bản, giảng viên phụ trách, thời hạn nộp, tỷ lệ đạo văn và thao tác xử lý.
+              Hiển thị danh sách báo cáo nộp, phiên bản, giảng viên phụ trách, thời hạn nộp và thao tác xử lý.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1350px] table-fixed">
+            <table className="w-full min-w-[1280px] table-fixed">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-850 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="px-6 py-4 text-left w-[18%]">Đề tài & Nhóm</th>
-                  <th className="px-6 py-4 text-left w-[13%]">Sinh viên</th>
-                  <th className="px-6 py-4 text-left w-[11%]">Thông tin lớp môn</th>
-                  <th className="px-6 py-4 text-left w-[10%]">Giảng viên phụ trách</th>
-                  <th className="px-6 py-4 text-left w-[11%]">Thời hạn nộp / Trạng thái</th>
-                  <th className="px-6 py-4 text-center w-[5%]">Đạo văn (%)</th>
+                  <th className="px-6 py-4 text-left w-[20%]">Đề tài & Nhóm</th>
+                  <th className="px-6 py-4 text-left w-[14%]">Sinh viên</th>
+                  <th className="px-6 py-4 text-left w-[12%]">Thông tin lớp môn</th>
+                  <th className="px-6 py-4 text-left w-[11%]">Giảng viên phụ trách</th>
+                  <th className="px-6 py-4 text-left w-[12%]">Thời hạn nộp / Trạng thái</th>
                   <th className="px-6 py-4 text-center w-[14%]">Trạng thái</th>
-                  <th className="px-6 py-4 text-center w-[18%]">Thao tác xử lý</th>
+                  <th className="px-6 py-4 text-center w-[17%]">Thao tác xử lý</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                 {isLoadingSubmissions ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-20 text-center">
+                    <td colSpan={7} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-8 h-8 text-violet-600 dark:text-violet-400 animate-spin" />
                         <span className="text-sm font-semibold text-slate-400">Đang tải tiến trình nộp báo cáo...</span>
@@ -650,34 +606,15 @@ export default function ProgressMonitoring() {
                   </tr>
                 ) : filteredSubmissions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-sm font-semibold text-slate-400">
+                    <td colSpan={7} className="px-6 py-12 text-center text-sm font-semibold text-slate-400">
                       Không tìm thấy báo cáo nào phù hợp với bộ lọc tìm kiếm!
                     </td>
                   </tr>
                 ) : (
                   filteredSubmissions.map(item => {
                     const delayInfo = getDelayInfo(item.submittedAt, item.deadlineAt);
-                    const isPlagiarismAlert = item.plagiarismScore > PLAGIARISM_THRESHOLD;
                     const hasPendingReview = !!(item.violationReason && (item.violationReason.includes('"type":"CHO_KIEM_TRA"') || item.violationReason.includes('"status":"CHO_KIEM_TRA"')));
-                    const hasWarning = isPlagiarismAlert || delayInfo.hasAlert || hasPendingReview;
-
-                    // Mức đạo văn
-                    let plagText = "Bình thường";
-                    let plagColor = "text-green-600 dark:text-green-400";
-                    let plagBg = "bg-green-500";
-                    if (item.plagiarismScore > 60) {
-                      plagText = "Rất nghiêm trọng";
-                      plagColor = "text-red-750 dark:text-red-500 font-extrabold animate-pulse";
-                      plagBg = "bg-red-700";
-                    } else if (item.plagiarismScore > 40) {
-                      plagText = "Nghi vấn cao";
-                      plagColor = "text-rose-600 dark:text-rose-400";
-                      plagBg = "bg-rose-500";
-                    } else if (item.plagiarismScore > 20) {
-                      plagText = "Cần kiểm tra";
-                      plagColor = "text-amber-600 dark:text-amber-400";
-                      plagBg = "bg-amber-500";
-                    }
+                    const hasWarning = delayInfo.hasAlert || hasPendingReview;
 
                     return (
                       <tr
@@ -787,37 +724,9 @@ export default function ProgressMonitoring() {
                           </div>
                         </td>
 
-                        {/* Plagiarism Similarity Gauge */}
-                        <td className="px-6 py-5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedSubForDetail(item);
-                              setIsDetailModalOpen(true);
-                            }}
-                            className="group hover:underline text-center inline-block"
-                            title="Xem chi tiết nguồn đối chiếu đạo văn"
-                          >
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <span className={`text-xs font-black ${plagColor}`}>
-                                {item.plagiarismScore}%
-                              </span>
-                            </div>
-                            <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden shadow-inner mx-auto mb-1">
-                              <div
-                                className={`h-full rounded-full transition-all ${plagBg}`}
-                                style={{ width: `${item.plagiarismScore}%` }}
-                              />
-                            </div>
-                            <span className={`text-[8.5px] font-bold block ${plagColor} uppercase tracking-wider`}>
-                              {plagText}
-                            </span>
-                          </button>
-                        </td>
-
                         {/* Status Badge */}
                         <td className="px-6 py-5 text-center whitespace-nowrap">
-                          {renderStatusBadge(item.status, item.plagiarismScore, item.violationReason)}
+                          {renderStatusBadge(item.status, item.violationReason)}
                         </td>
 
                         {/* Quick Action Button for Admin */}
@@ -844,10 +753,7 @@ export default function ProgressMonitoring() {
                                   setSelectedSubForViolation(item);
                                   setIsViolationModalOpen(true);
                                 }}
-                                className={`h-8 rounded-lg text-[10px] font-bold px-2.5 flex items-center gap-1.5 shadow-sm border border-transparent transition-all ${isPlagiarismAlert
-                                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/10'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:bg-slate-850 dark:text-slate-300 dark:border-slate-800'
-                                  }`}
+                                className="h-8 rounded-lg text-[10px] font-bold px-2.5 flex items-center gap-1.5 shadow-sm border border-transparent transition-all bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:bg-slate-850 dark:text-slate-300 dark:border-slate-800"
                               >
                                 <ShieldAlert className="w-3.5 h-3.5" /> Kiểm tra / xử lý
                               </Button>
@@ -916,7 +822,6 @@ export default function ProgressMonitoring() {
                   <div><strong className="text-slate-700 dark:text-slate-400">Sinh viên:</strong> {selectedSubForViolation.studentName}</div>
                   <div><strong className="text-slate-700 dark:text-slate-400">Lớp môn học:</strong> {selectedSubForViolation.classCode} ({selectedSubForViolation.courseName})</div>
                   <div><strong className="text-slate-700 dark:text-slate-400">Giảng viên chấm:</strong> {selectedSubForViolation.teacherName}</div>
-                  <div><strong className="text-slate-700 dark:text-slate-400">Tỉ lệ trùng lặp:</strong> <span className="text-rose-600 font-extrabold">{selectedSubForViolation.plagiarismScore}%</span></div>
                   <div className="col-span-2">
                     <strong className="text-slate-700 dark:text-slate-400">Trạng thái nộp:</strong>{' '}
                     {(() => {
@@ -953,7 +858,7 @@ export default function ProgressMonitoring() {
                   onChange={e => setViolationType(e.target.value)}
                   className="w-full h-10 px-3 py-2 rounded-xl border border-slate-200/80 bg-slate-50 focus:bg-white text-xs font-bold focus:ring-1 focus:ring-rose-500 focus:outline-none dark:bg-slate-950 dark:border-slate-800"
                 >
-                  <option value="DA_VAN">Đạo văn (Plagiarism Alert)</option>
+                  <option value="DA_VAN">Đạo văn</option>
                   <option value="SAI_DE_TAI">Nộp sai đề tài đăng ký</option>
                   <option value="SAI_DINH_DANG">Sai định dạng quy định nghiêm trọng</option>
                   <option value="FILE_LOI">Tệp tin báo cáo bị hỏng / không mở được</option>
@@ -970,7 +875,7 @@ export default function ProgressMonitoring() {
                   id="violation-reason"
                   rows={4}
                   required
-                  placeholder="Mô tả chi tiết bằng tiếng Việt có dấu. Ví dụ: Bài viết trùng 42% tài liệu tham khảo khóa trước tại địa chỉ..."
+                  placeholder="Mô tả chi tiết bằng tiếng Việt có dấu. Ví dụ: Nội dung sai đề tài đăng ký, định dạng không hợp quy chuẩn..."
                   value={violationReasonText}
                   onChange={e => setViolationReasonText(e.target.value)}
                   className="w-full p-3 text-xs font-semibold rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:outline-none bg-slate-50 focus:bg-white dark:bg-slate-950 dark:border-slate-800"
@@ -1045,7 +950,7 @@ export default function ProgressMonitoring() {
               <div className="flex items-center gap-2.5">
                 <FileText className="w-5.5 h-5.5 text-violet-500 shrink-0" />
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Báo cáo kiểm định Đạo văn & Chi tiết Submission</h3>
+                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Chi tiết Submission</h3>
                   <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Mã báo cáo: {selectedSubForDetail.id} • Chi tiết thông tin kiểm duyệt</p>
                 </div>
               </div>
@@ -1085,49 +990,6 @@ export default function ProgressMonitoring() {
                       <p className="text-violet-600 font-bold">Thời gian nộp bài: {new Date(selectedSubForDetail.submittedAt).toLocaleString('vi-VN')}</p>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Plagiarism Similarity Analysis */}
-              <div className="space-y-3">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Báo cáo phân tích Đạo văn</span>
-
-                <div className="p-5 border border-slate-100 dark:border-slate-850 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1 text-center md:text-left">
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Tỷ lệ tương đồng nội dung tổng quát</div>
-                    <p className="text-[10px] text-slate-400 font-semibold">EduGrade Pro Similarity Engine tự động kiểm tra trùng khớp khóa.</p>
-                  </div>
-
-                  <div className="flex items-center gap-4.5">
-                    <div className="text-center">
-                      <div className={`text-3xl font-black ${selectedSubForDetail.plagiarismScore > PLAGIARISM_THRESHOLD
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : 'text-green-600 dark:text-green-400'
-                        }`}>
-                        {selectedSubForDetail.plagiarismScore}%
-                      </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Trùng khớp</span>
-                    </div>
-                    <div className="h-10 w-[1px] bg-slate-200 dark:bg-slate-800" />
-                    <div>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold ${selectedSubForDetail.plagiarismScore > PLAGIARISM_THRESHOLD
-                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/20'
-                        : 'bg-green-50 text-green-700 dark:bg-green-950/20'
-                        }`}>
-                        {selectedSubForDetail.plagiarismScore > PLAGIARISM_THRESHOLD ? 'Vượt ngưỡng an toàn' : 'Trong ngưỡng an toàn'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Matched sources */}
-                <div className="space-y-2">
-                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Nguồn đối chiếu trùng khớp:</div>
-                  <p className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-400 text-center font-bold rounded-xl text-xs">
-                    {selectedSubForDetail.plagiarismScore > 0
-                      ? 'Kết quả chi tiết các nguồn đối chiếu tương đồng sẽ hiển thị ở phân hệ báo cáo đạo văn của PDT.'
-                      : 'Không phát hiện nguồn trùng khớp đáng nghi vấn.'}
-                  </p>
                 </div>
               </div>
 

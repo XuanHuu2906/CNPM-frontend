@@ -15,7 +15,6 @@ import {
   ChevronRight,
   ChevronLeft,
   Download,
-  ShieldCheck,
   Ban,
   ExternalLink,
   Info
@@ -29,9 +28,8 @@ interface TopicReport {
   groupName: string;
   topicName: string;
   members: string[];
-  score: number | null; 
-  plagiarismRate: number; 
-  comments: string; 
+  score: number | null;
+  comments: string;
   status: 'CHO_DUYET' | 'HOAN_THANH' | 'DANG_CHAM';
   rubricBreakdown: { name: string; weight: number; score: number | null; comment: string }[];
   version: number;
@@ -148,7 +146,6 @@ export default function AcademicApprovals() {
             topicName,
             members,
             score: grade && grade.finalScore != null ? Number(grade.finalScore) : null,
-            plagiarismRate: sub.plagiarismRate || 0,
             comments: grade?.feedback || '',
             status,
             rubricBreakdown,
@@ -350,7 +347,7 @@ export default function AcademicApprovals() {
           Phê duyệt Kết quả Chấm điểm <FileCheck2 className="w-8 h-8 text-indigo-500" />
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold mt-1">
-          Rà soát kết quả chấm thi, cơ cấu phổ điểm Rubric, tỷ lệ đạo văn Turnitin và phê duyệt chính thức công khai.
+          Rà soát kết quả chấm thi, cơ cấu phổ điểm Rubric và phê duyệt chính thức công khai.
         </p>
       </div>
 
@@ -569,17 +566,6 @@ export default function AcademicApprovals() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-4 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 mt-1 text-xs">
-                          <div className="flex items-center gap-1.5 font-bold min-w-0">
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider shrink-0">Độ trùng lặp:</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] shrink-0 ${
-                              report.plagiarismRate >= 30 
-                                ? 'bg-rose-50 text-rose-600 border border-rose-100 dark:bg-rose-950/40' 
-                                : 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40'
-                            }`}>
-                              {report.plagiarismRate}% Turnitin
-                            </span>
-                          </div>
-
                           <div className="flex items-center gap-1 text-slate-800 dark:text-slate-200 ml-auto font-black text-sm">
                             {report.score !== null ? (
                               <span>{report.score.toFixed(1)} <span className="text-[10px] text-muted-foreground font-semibold">Điểm</span></span>
@@ -720,22 +706,6 @@ export default function AcademicApprovals() {
                       </p>
                     </div>
 
-                    {/* Plagiarism details warning */}
-                    <div className={`p-4 rounded-xl border flex gap-3 ${
-                      currentReport.plagiarismRate >= 30 
-                        ? 'bg-rose-50/30 border-rose-100 text-rose-700' 
-                        : 'bg-emerald-50/30 border-emerald-100 text-emerald-700'
-                    }`}>
-                      <ShieldCheck className="w-5 h-5 shrink-0" />
-                      <div className="text-xs text-left font-semibold">
-                        <h5 className="font-extrabold uppercase text-[10px] tracking-wider">Turnitin Plagiarism Index</h5>
-                        <p className="mt-1 leading-relaxed text-slate-600 dark:text-slate-400">
-                          {currentReport.plagiarismRate >= 30 
-                            ? 'Mức độ trùng lặp vượt ngưỡng cho phép (30%). Phòng Đào tạo lưu ý rà soát kỹ.' 
-                            : 'Mức độ trùng lặp nằm trong phạm vi quy chế an toàn cho phép.'}
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/10 flex flex-col gap-2 shrink-0">
@@ -779,7 +749,7 @@ export default function AcademicApprovals() {
                 rows={4}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Nhập lý do chi tiết (ví dụ: Tỷ lệ trùng lặp Turnitin cao vượt quy chuẩn 42%, yêu cầu làm việc với SV)..."
+                placeholder="Nhập lý do chi tiết (ví dụ: thiếu phần phân tích yêu cầu, rubric tiêu chí A chưa đạt, yêu cầu làm việc với SV)..."
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
               />
             </div>

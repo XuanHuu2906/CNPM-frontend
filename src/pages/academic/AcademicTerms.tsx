@@ -37,7 +37,6 @@ export default function AcademicTerms() {
 
   // Cấu hình tham số học tập từ System Configuration API
   const [maxSubmissions, setMaxSubmissions] = useState(5);
-  const [plagiarismLimit, setPlagiarismLimit] = useState(20);
   const [rubricStrict, setRubricStrict] = useState(true);
 
   // Tải danh sách Học kỳ và cấu hình hệ thống thực tế
@@ -54,9 +53,6 @@ export default function AcademicTerms() {
       // Trích xuất cấu hình hệ thống học vụ
       const maxSubConfig = configsData.find(c => c.key === 'MAX_SUBMISSIONS');
       if (maxSubConfig) setMaxSubmissions(Number(maxSubConfig.value));
-
-      const plagConfig = configsData.find(c => c.key === 'PLAGIARISM_THRESHOLD');
-      if (plagConfig) setPlagiarismLimit(Number(plagConfig.value));
 
       const strictConfig = configsData.find(c => c.key === 'RUBRIC_STRICT');
       if (strictConfig) setRubricStrict(strictConfig.value === 'true');
@@ -133,7 +129,6 @@ export default function AcademicTerms() {
 
       await Promise.all([
         adminService.updateConfig('MAX_SUBMISSIONS', String(maxSubmissions)),
-        adminService.updateConfig('PLAGIARISM_THRESHOLD', String(plagiarismLimit)),
         adminService.updateConfig('RUBRIC_STRICT', String(rubricStrict))
       ]);
 
@@ -281,24 +276,6 @@ export default function AcademicTerms() {
                   />
                 </div>
 
-                {/* Plagiarism limit threshold */}
-                <div className="space-y-1.5 text-left">
-                  <div className="flex items-center gap-1">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ngưỡng cảnh báo Đạo văn (%)</label>
-                    <span title="Hệ thống sẽ bôi đỏ cảnh báo khẩn cấp tại dashboard chấm điểm nếu kết quả quét Turnitin vượt ngưỡng này.">
-                      <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-pointer" />
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={plagiarismLimit}
-                      onChange={(e) => setPlagiarismLimit(Number(e.target.value))}
-                      className="w-full pl-4 pr-12 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/40 text-sm focus:outline-none text-slate-700 dark:text-slate-300"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
-                  </div>
-                </div>
               </div>
 
               {/* Strict validation toggle */}
