@@ -28,7 +28,7 @@ export default function GradingList() {
   const [fetchingSubmissions, setFetchingSubmissions] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('HIDE_CHUA_NOP');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Load profiles and rubrics
   useEffect(() => {
@@ -126,14 +126,7 @@ export default function GradingList() {
     const matchesSearch = (g.topic || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (g.groupName || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    let matchesStatus = false;
-    if (statusFilter === 'HIDE_CHUA_NOP') {
-      matchesStatus = g.status !== 'CHUA_NOP';
-    } else if (statusFilter === 'ALL') {
-      matchesStatus = true;
-    } else {
-      matchesStatus = g.status === statusFilter;
-    }
+    const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -203,13 +196,13 @@ export default function GradingList() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="w-full md:w-56 pl-3 pr-8 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm focus:outline-none transition-all text-slate-700"
           >
-            <option value="HIDE_CHUA_NOP">Đang xử lý (Ẩn Chưa nộp)</option>
-            <option value="ALL">Tất cả trạng thái (Bao gồm Chưa nộp)</option>
+            <option value="ALL">Tất cả trạng thái</option>
             <option value="CHUA_NOP">Chưa nộp</option>
             <option value="DA_NOP">Đã nộp</option>
             <option value="DANG_CHAM">Đang chấm</option>
-            <option value="DA_CHAM">Đã chấm</option>
             <option value="YEU_CAU_SUA">Yêu cầu sửa</option>
+            <option value="DA_CHAM">Đã chấm</option>
+            <option value="TU_CHOI">Từ chối</option>
           </select>
         </div>
       </div>
@@ -308,15 +301,15 @@ export default function GradingList() {
                               </button>
                             )}
 
-                            {!isUnsubmitted && hasRubrics && (isWaitingForFix || isRejected) && (
-                              <button
-                                disabled
-                                title={isWaitingForFix ? 'Đang chờ sinh viên nộp lại' : 'Bài đã bị từ chối'}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-xl text-xs font-bold cursor-not-allowed"
-                              >
-                                {isWaitingForFix ? 'Chờ SV sửa' : 'Đã từ chối'}
-                              </button>
-                            )}
+                             {!isUnsubmitted && hasRubrics && isWaitingForFix && (
+                               <button
+                                 disabled
+                                 title="Đang chờ sinh viên nộp lại"
+                                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-xl text-xs font-bold cursor-not-allowed"
+                               >
+                                 Chờ SV sửa
+                               </button>
+                             )}
 
                             {!isUnsubmitted && hasRubrics && !isWaitingForFix && !isRejected && (
                               <button

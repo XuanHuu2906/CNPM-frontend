@@ -15,7 +15,6 @@ import {
 import {
   Users,
   FileText,
-  Clock,
   Activity,
   AlertTriangle,
   ChevronRight,
@@ -32,7 +31,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 import { academicService } from '../../services/academicService';
 
 interface ProgressStudent {
@@ -51,7 +49,6 @@ interface ProgressStudent {
 }
 
 export default function AcademicDashboard() {
-  const navigate = useNavigate();
   // 1. Quản lý Bộ lọc (Filter States)
   const [selectedSemester, setSelectedSemester] = useState('all');
   const [selectedDept, setSelectedDept] = useState('all');
@@ -173,7 +170,6 @@ export default function AcademicDashboard() {
   // Tự động tính toán lại KPI động dựa trên bộ lọc
   const totalCount = filteredStudents.length;
   const completedCount = filteredStudents.filter(s => s.status === 'DA_CHAM').length;
-  const pendingApprovalCount = 0;
   const gradingCount = filteredStudents.filter(s => s.status === 'DANG_CHAM').length;
 
   const dynamicStats = [
@@ -192,14 +188,7 @@ export default function AcademicDashboard() {
       color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
     },
     {
-      title: 'Chờ duyệt điểm',
-      value: pendingApprovalCount,
-      description: 'Cần duyệt kết quả gấp',
-      icon: Clock,
-      color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-    },
-    {
-      title: 'Đang xử lý chấm',
+      title: 'Đang chấm điểm',
       value: gradingCount,
       description: 'Giảng viên đang chấm điểm',
       icon: Activity,
@@ -212,7 +201,7 @@ export default function AcademicDashboard() {
     { name: 'Đã nộp', value: studentsProgress.filter(s => s.status === 'DA_NOP').length, color: '#6366f1' },
     { name: 'Đang chấm', value: studentsProgress.filter(s => s.status === 'DANG_CHAM').length, color: '#3b82f6' },
     { name: 'Đã chấm', value: studentsProgress.filter(s => s.status === 'DA_CHAM').length, color: '#10b981' },
-    { name: 'Từ chối / Khác', value: studentsProgress.filter(s => s.status === 'TU_CHOI' || s.status === 'YEU_CAU_SUA').length, color: '#f43f5e' }
+    { name: 'Khác', value: studentsProgress.filter(s => s.status === 'TU_CHOI' || s.status === 'YEU_CAU_SUA').length, color: '#f43f5e' }
   ];
 
   // 4. Dữ liệu Thống kê theo Bộ môn (BarChart)
@@ -476,24 +465,19 @@ export default function AcademicDashboard() {
 
       {/* KPI GRID */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map(n => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(n => (
             <div key={n} className="h-24 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-2xl" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {dynamicStats.map((stat, idx) => {
             const IconComponent = stat.icon;
-            const isClickable = stat.title === 'Chờ duyệt điểm';
             return (
               <Card
                 key={idx}
-                onClick={isClickable ? () => navigate('/academic/approvals') : undefined}
-                className={`border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm rounded-2xl transition-all duration-300 ${isClickable
-                  ? 'hover:scale-[1.02] cursor-pointer hover:border-amber-400/50 hover:shadow-amber-500/5'
-                  : 'hover:scale-[1.02]'
-                  }`}
+                className="border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm rounded-2xl transition-all duration-300 hover:scale-[1.02]"
               >
                 <CardContent className="p-6 flex items-center justify-between">
                   <div className="space-y-1 text-left">
@@ -613,7 +597,7 @@ export default function AcademicDashboard() {
 
           {/* STATUS TABS */}
           <div className="flex flex-wrap gap-1.5 mb-6">
-            {(['all', 'CHUA_NOP', 'DA_NOP', 'DANG_CHAM', 'YEU_CAU_SUA', 'DA_CHAM', 'TU_CHOI'] as const).map((tab) => (
+            {(['all', 'CHUA_NOP', 'DA_NOP', 'DANG_CHAM', 'YEU_CAU_SUA', 'DA_CHAM'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSelectedStatusTab(tab)}
