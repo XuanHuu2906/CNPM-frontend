@@ -190,6 +190,19 @@ export default function StudentSubmit() {
         }
 
         setUploadedFiles(files);
+      } else {
+        // Chưa có bài nộp (status = CHUA_NOP), tải bản nháp từ localStorage nếu có
+        const draftStr = localStorage.getItem(`student-draft-files-${profile.id}`);
+        if (draftStr) {
+          try {
+            const draftFiles = JSON.parse(draftStr);
+            if (Array.isArray(draftFiles) && draftFiles.length > 0) {
+              setUploadedFiles(draftFiles);
+            }
+          } catch (err) {
+            console.error('Lỗi đọc bản nháp:', err);
+          }
+        }
       }
     } catch (error) {
       console.error('Lỗi tải thông tin bài nộp:', error);
